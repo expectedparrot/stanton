@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stanton"
+version = "0.6.1"
+description = "A provenance-preserving numerical estimation workbench for people and agents"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.24", "scipy>=1.10", "pint>=0.24"]
+
+[project.urls]
+Repository = "https://github.com/expectedparrot/stanton"
+Issues = "https://github.com/expectedparrot/stanton/issues"
+
+[project.optional-dependencies]
+fielding = ["edsl>=1.0.8"]
+dev = ["pytest>=8", "build>=1", "ruff>=0.6"]
+
+[project.scripts]
+stanton = "stanton.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

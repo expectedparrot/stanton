@@ -1,0 +1,3 @@
+include README.md DESIGN.md spec.md AGENTS.md
+recursive-include examples *.py
+recursive-include docs *.md
