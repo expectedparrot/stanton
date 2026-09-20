@@ -20,23 +20,34 @@ def model(tmp_path):
     s.estimate("population", Distribution.from_point(100), source="Synthetic census")
     s.estimate("rate", Distribution.from_interval(.4, .6, shape="logitnormal"), reason="Synthetic bounded prior")
     s.relate("total", "population * rate")
+    baseline = s.sample("total", n=20)
+    s.estimate("rate", Distribution.from_point(.9), reason="Synthetic high-share sensitivity")
+    variation = s.sample("total", n=20)
+    s.estimate("rate", Distribution.from_interval(.4, .6, shape="logitnormal"), reason="Restore baseline")
+    s.test_comparison = {"baseline_run": baseline["id"], "variation_run": variation["id"], "reason": "Stress the share at .9"}
     return s
 
 
 def document(s, run_id=None, status="reviewed"):
     d = s.research_template("total", run_id=run_id)
     d.update(status=status, scope="Synthetic fixture: unique firms, not directory listings.",
+             scope_details={"population": "Synthetic unique firms", "geography": "United States", "counting_unit": "count",
+                            "inclusions": "Paid commercial firms", "exclusions": "Free accounts, education, government, nonprofits",
+                            "interpretation": "US headquartered, not any US office",
+                            "reference_period": {"start": "2026-01-01", "end": "2026-12-31"}},
              searches=[{"query": "Synthetic register", "outcome": "Exact population count available in fixture."}],
              sources=[{"id": "register", "reference": "Synthetic fixture, not real evidence", "claim": "100 firms",
                        "population": "Synthetic unique firms", "target_mapping": "Same population; modeled form share is judgment.",
                        "method": "Synthetic complete register", "limitations": "No empirical generalization",
                        "publication_date": "Not applicable: synthetic", "observation_period": "Synthetic period",
-                       "accessed_at": "2026-09-20", "applies_to": ["population"], "ancestry": ["fixture"]}],
+                       "accessed_at": "2026-09-20", "applies_to": ["population"], "ancestry": ["fixture"],
+                       "observation_window": {"start": "2026-01-01", "end": "2026-12-31"},
+                       "temporal_status": "aligned", "temporal_mapping": "Same synthetic period"}],
              reconciliation="Fixture has no competing measured claims; rate is labeled judgment.",
              alternative_model="Complete synthetic register; no separately generated measurement in fixture.",
              dependence="Only one method in baseline; shares are judgment, not independent evidence.",
              uncertainty="Bounded rate prior; no empirical coverage claim.",
-             sensitivity={"comparisons": [], "not_applicable_reason": "Synthetic API fixture; no empirical sensitivity claim."},
+             sensitivity={"status": "performed", "comparisons": [s.test_comparison], "reason": "Stress the synthetic share"},
              stopping={"reason": "Synthetic demonstration complete; not an empirical finding.", "remaining_gaps": []})
     return d
 
@@ -144,7 +155,7 @@ def test_sensitivity_requires_changed_inputs_and_records_actual_effect(tmp_path)
     a = s.sample("total", n=100, seed=0)
     b = s.sample("total", n=200, seed=1)
     d = document(s)
-    d["sensitivity"] = {"comparisons": [{"baseline_run": a["id"], "variation_run": b["id"], "reason": "Attempted placebo"}], "not_applicable_reason": ""}
+    d["sensitivity"] = {"comparisons": [{"baseline_run": a["id"], "variation_run": b["id"], "reason": "Attempted placebo"}], "status": "performed", "reason": "Vary a consequential input"}
     with pytest.raises(StantonError, match="changed numerical inputs"):
         s.research_review("placebo", d)
     s.estimate("rate", Distribution.from_point(.9), reason="High rate sensitivity")
@@ -173,7 +184,7 @@ def test_provenance_rewrite_bound_draws_and_unrelated_inputs_are_not_sensitivity
     b = s.sample("total", n=200, seed=1)
     assert numerical_inputs(a, frozen) == numerical_inputs(b, s.store.read()[0])
     d = document(s)
-    d["sensitivity"] = {"comparisons": [{"baseline_run": a["id"], "variation_run": b["id"], "reason": "Provenance only"}], "not_applicable_reason": ""}
+    d["sensitivity"] = {"comparisons": [{"baseline_run": a["id"], "variation_run": b["id"], "reason": "Provenance only"}], "status": "performed", "reason": "Vary a consequential input"}
     with pytest.raises(StantonError, match="changed numerical inputs"):
         s.research_review("not_sensitivity", d)
 
@@ -189,21 +200,23 @@ def test_dependence_detects_shared_leaves_sources_and_ancestry(tmp_path):
     assert overlap["shared_leaves"] == ["population", "rate"]
     assert overlap["shared_source_ids"] == ["register"]
     assert overlap["shared_ancestry"] == ["fixture"]
+    d["warning_dispositions"] = [{"warning_id": f["id"], "reason": "Shared evidence; no independent corroboration claim."} for f in record["findings"]]
+    s.research_review("acknowledged", d)
     with pytest.raises(StantonError, match="Choose --method"):
-        s.report_issue("ambiguous", review="dependent")
-    issued = s.report_issue("mixture_answer", review="dependent", method="mixture")["record"]
+        s.report_issue("ambiguous", review="acknowledged")
+    issued = s.report_issue("mixture_answer", review="acknowledged", method="mixture")["record"]
     assert set(issued["strategies"]) == {"strategy:main", "strategy:topdown", "mixture"}
     assert s.validate()["ok"]
 
 
-@pytest.mark.parametrize("change", ["headline", "review_binding", "sensitivity", "rewrite", "remove"])
+@pytest.mark.parametrize("change", ["headline", "review_binding", "sensitivity", "rewrite", "remove", "presentation"])
 def test_archives_roundtrip_and_reject_resigned_research_tampering(tmp_path, change):
     s = model(tmp_path)
     a = s.sample("total", n=25)
     s.estimate("rate", Distribution.from_point(.9), reason="Sensitivity")
     b = s.sample("total", n=25)
     d = document(s)
-    d["sensitivity"] = {"comparisons": [{"baseline_run": a["id"], "variation_run": b["id"], "reason": "Test change"}], "not_applicable_reason": ""}
+    d["sensitivity"] = {"comparisons": [{"baseline_run": a["id"], "variation_run": b["id"], "reason": "Test change"}], "status": "performed", "reason": "Vary a consequential input"}
     s.research_review("review", d)
     s.report_issue("answer", review="review")
     s.note("total", "Later evidence preserves original artifacts")
@@ -219,6 +232,8 @@ def test_archives_roundtrip_and_reject_resigned_research_tampering(tmp_path, cha
         state = row["body"]
         if change == "headline" and "answer" in state.get("issued_reports", {}):
             state["issued_reports"]["answer"]["headline"]["median"] = 123
+        elif change == "presentation" and "answer" in state.get("issued_reports", {}):
+            state["issued_reports"]["answer"]["presentation"]["headline"] = "Verified current estimate for all US organizations"
         elif change == "review_binding" and "review" in state.get("research_reviews", {}):
             state["research_reviews"]["review"]["run_sha256"] = "0" * 64
         elif change == "sensitivity" and "review" in state.get("research_reviews", {}):
@@ -283,7 +298,7 @@ def test_unknown_sensitivity_run_and_revision_races_do_not_write_records(tmp_pat
     s = model(tmp_path)
     s.sample("total", n=20)
     d = document(s)
-    d["sensitivity"] = {"comparisons": [{"baseline_run": "missing", "variation_run": d["run_id"], "reason": "Invalid reference"}], "not_applicable_reason": ""}
+    d["sensitivity"] = {"comparisons": [{"baseline_run": "missing", "variation_run": d["run_id"], "reason": "Invalid reference"}], "status": "performed", "reason": "Vary a consequential input"}
     before = s.store.read()
     with pytest.raises(StantonError):
         s.research_review("missing", d)
@@ -291,3 +306,156 @@ def test_unknown_sensitivity_run_and_revision_races_do_not_write_records(tmp_pat
     with pytest.raises(StantonError, match="Expected revision"):
         stale.research_review("racing", document(s))
     assert s.store.read() == before
+
+
+def test_missing_sensitivity_is_a_gap_that_dispositions_cannot_waive(tmp_path):
+    s = model(tmp_path)
+    s.sample("total", n=100)
+    d = document(s)
+    d["sensitivity"] = {"status": "not_performed", "comparisons": [], "reason": "Compared two methods instead of testing assumptions"}
+    before = s.store.read()
+    preview = s.research_check(d)
+    assert s.store.read() == before
+    gap = next(f for f in preview["warnings"] if f["code"] == "sensitivity-not-performed")
+    d["warning_dispositions"] = [{"warning_id": gap["id"], "reason": "We acknowledge the omission"}]
+    s.research_review("unperformed", d)
+    with pytest.raises(StantonError, match="requires provisional"):
+        s.report_issue("cannot_waive", review="unperformed")
+    d["status"] = "provisional"
+    s.research_review("interim", d)
+    issued = s.report_issue("interim", review="interim")["record"]
+    assert issued["research_gaps"][0]["code"] == "sensitivity-not-performed"
+    assert "not been stress-tested" in issued["presentation"]["limitations"][0]
+    assert "sensitivity-not-performed" in {w["code"] for w in s.research_show("interim", issued=True)["warnings"]}
+
+
+def test_uncertain_model_cannot_use_not_applicable_escape_clause(tmp_path):
+    s = model(tmp_path)
+    s.sample("total", n=1)
+    d = document(s, status="provisional")
+    d["sensitivity"] = {"status": "not_applicable", "comparisons": [], "reason": "Monte Carlo already captures uncertainty"}
+    with pytest.raises(StantonError, match="not inapplicable"):
+        s.research_review("escape", d)
+    s.estimate("rate", Distribution.from_point(.5), reason="Deterministic fixture")
+    s.sample("total", n=10)
+    d["run_id"] = s.store.run()["id"]
+    d["sensitivity"]["reason"] = "Complete deterministic fixture, with no uncertain inputs"
+    assert s.research_check(d)["review"]["findings"][0]["code"] == "sensitivity-not-applicable"
+
+
+def test_ratio_conflict_and_unresolved_explanation_survive_issuance(tmp_path):
+    s = model(tmp_path)
+    s.sample("total", n=20)
+    d = document(s, status="provisional")
+    d["numeric_checks"] = [{"id": "us_share", "source_id": "register", "numerator": 41009, "denominator": 82255,
+                            "reported_ratio": .6191, "denominator_population": "All reported global detections",
+                            "explanation": "Geography percentage may use a smaller population; not verified"}]
+    d["discrepancies"] = [{"id": "population", "claim": "Global detections do not establish a US commercial lower bound",
+                           "source_ids": ["register"], "status": "unresolved", "explanation": "May include nonprofits and foreign firms"}]
+    preview = s.research_check(d)["review"]
+    mismatch = next(f for f in preview["findings"] if f["code"] == "source-ratio-mismatch")
+    assert mismatch["calculated_ratio"] == pytest.approx(.498559358)
+    d["warning_dispositions"] = [{"warning_id": f["id"], "reason": "Disclosed as unresolved"} for f in preview["findings"]]
+    s.research_review("sources", d)
+    issued = s.report_issue("sources_answer", review="sources")["record"]
+    assert len(issued["research_gaps"]) == 2
+    assert len(issued["presentation"]["limitations"]) == 2
+    assert report_context(s, "total")["warnings"]
+    d["discrepancies"][0]["status"] = "resolved"
+    with pytest.raises(StantonError, match="Evidence resolving"):
+        s.research_check(d)
+    d["numeric_checks"][0]["tolerance"] = .2
+    d["discrepancies"][0]["status"] = "unresolved"
+    with pytest.raises(StantonError, match="tolerance"):
+        s.research_check(d)
+
+
+def test_scope_dates_and_unknown_temporal_mapping_are_visible(tmp_path):
+    s = model(tmp_path)
+    s.sample("total", n=20)
+    d = document(s, status="provisional")
+    d["scope_details"]["reference_period"] = {"start": "2025-01-01", "end": "2025-12-31"}
+    with pytest.raises(StantonError, match="outside the target period"):
+        s.research_check(d)
+    d["sources"][0].update(temporal_status="unresolved", temporal_mapping="2026 detections may not represent 2025")
+    s.research_review("dated", d)
+    result = s.report_issue("dated", review="dated")["record"]
+    assert "2025-01-01 to 2025-12-31" in result["presentation"]["headline"]
+    assert "United States" in result["presentation"]["headline"]
+    assert result["presentation"]["exclusions"] == d["scope_details"]["exclusions"]
+    assert result["research_gaps"][0]["code"] == "unresolved-source-period"
+    d["sources"][0].update(observation_window=None, temporal_status="aligned")
+    with pytest.raises(StantonError, match="Unknown observation"):
+        s.research_check(d)
+    d["sources"][0]["temporal_status"] = "adjusted"
+    with pytest.raises(StantonError, match="Evidence supporting"):
+        s.research_check(d)
+
+
+def test_conceptual_input_dependency_detected_without_shared_model_leaves(tmp_path):
+    s = model(tmp_path)
+    for name, value in [("detections", 300), ("correction", 3)]:
+        s.define(name, units="dimensionless", definition="Synthetic " + name)
+        s.estimate(name, Distribution.from_point(value), reason="Synthetic")
+    s.fork("total", "crawl", reason="Alternative route")
+    s.relate("total", "detections / correction", fork="crawl")
+    s.merge("total", ["main", "crawl"], [.6, .4], reason="Synthetic mixture")
+    s.sample("total", n=20)
+    d = document(s, status="provisional")
+    d["input_dependencies"] = [{"quantity": "correction", "depends_on": ["population"], "reason": "Correction calibrated using the official population total"}]
+    record = s.research_review("circular", d)["record"]
+    overlap = record["dependency_overlap"][0]
+    assert not overlap["shared_leaves"]
+    assert overlap["shared_source_ids"] == ["register"]
+    assert "population" in overlap["shared_evidence_quantities"]
+    result = s.report_issue("circular", review="circular", method="strategy:main")["record"]
+    assert result["dependency_overlap"] == record["dependency_overlap"]
+    assert "shared-strategy-evidence" in {f["code"] for f in result["findings"]}
+
+
+def test_legacy_review_and_issuance_remain_immutable_but_cannot_issue_anew(tmp_path):
+    from stanton.common import now
+    from stanton.research_records import LEGACY_ENGINE, issuance_data, review_data
+    s = model(tmp_path)
+    s.sample("total", n=20)
+    d = document(s, status="provisional")
+    for key in ("schema_version", "scope_details", "numeric_checks", "discrepancies", "input_dependencies"):
+        d.pop(key)
+    d["sensitivity"] = {"comparisons": [], "not_applicable_reason": "Legacy rationale"}
+    state, revision = s.store.read()
+    created = now()
+    data = review_data(d, state, revision, s.store.run, lambda r: s.store.read(r)[0], created, engine=LEGACY_ENGINE)
+    s._research_record("research_reviews", "old_review", data, state, created)
+    state, revision = s.store.read()
+    data = issuance_data(state, revision, "old_review", s.store.run, lambda r: s.store.read(r)[0], engine=LEGACY_ENGINE)
+    original = s._research_record("issued_reports", "old_answer", data, state, now())["record"]
+    assert s.validate()["ok"]
+    assert s.research_show("old_answer", issued=True)["record"] == original
+    with pytest.raises(StantonError, match="predates"):
+        s.report_issue("new_from_old", review="old_review")
+    archive = tmp_path / "legacy.gz"
+    s.save(archive)
+    restored = Session(tmp_path / "restored")
+    restored.load(archive)
+    assert restored.research_show("old_answer", issued=True)["record"] == original
+    assert {w["code"] for w in restored.research_show("old_answer", issued=True)["warnings"]} >= {"legacy-research-review", "sensitivity-not-performed", "provisional-result"}
+
+
+def test_issued_presentation_preserves_fractional_headlines(tmp_path):
+    s = model(tmp_path)
+    s.estimate("population", Distribution.from_point(.001), reason="Small synthetic scale")
+    s.sample("total", n=20)
+    s.research_review("small", document(s))
+    report = s.report_issue("small", review="small")["record"]
+    assert f"{report['headline']['median']:,.6g}" in report["presentation"]["headline"]
+    assert "estimate: 0 count" not in report["presentation"]["headline"]
+
+
+@pytest.mark.parametrize("field", ["discrepancies", "numeric_checks", "input_dependencies"])
+def test_malformed_research_entries_return_structured_errors(tmp_path, field):
+    s = model(tmp_path)
+    s.sample("total", n=10)
+    d = document(s)
+    d[field] = ["not an object"]
+    with pytest.raises(StantonError, match="must be an object"):
+        s.research_check(d)

@@ -61,14 +61,33 @@ actual evidence. Run schema research_review for its field contract. Sensitivity
 comparisons reference baseline_run and variation_run with changed numerical
 inputs, not merely a different seed or strategy; restore the intended model and
 save the final run after stress tests. For multi-context runs, save sensitivity
-runs selecting the same single definition and decision context. If sensitivity
-is inapplicable, explain the concrete reason. Do not invent comparisons.
+runs selecting the same single definition and decision context. Schema 2 requires
+scope_details (population, geography, counting_unit, inclusions, exclusions,
+interpretation, and reference_period with start/end ISO dates). Each source needs
+observation_window (start/end or null), temporal_status (aligned, adjusted,
+unresolved, unknown), and temporal_mapping; adjusted timing also needs evidence
+in temporal_evidence. Unknown or unreconciled source timing requires provisional
+issuance. Record discrepancies with status resolved/unresolved; resolved entries
+need evidence, not just plausible explanations. Use numeric_checks to compare
+source numerator/denominator with reported_ratio (a fraction, not a percentage).
+Record input_dependencies when a judgment borrows another quantity's evidence.
+Sensitivity status is performed, not_performed, or not_applicable; supply reason.
+Not_performed is a gap and cannot be waived by a warning disposition. Not_applicable
+is only allowed for deterministic models with justification. Do not invent tests.
+Research check --from review.json previews computed findings without saving a
+revision. Use its finding IDs for warning_dispositions; model-only template hints
+cannot include source conflicts discovered after you fill the evidence fields.
 Research review NAME --from review.json saves the review and computed comparisons.
 Read research show NAME for detected shared leaves, sources, and ancestry; an
 absence of detected overlap does not establish independence. A source outside
 the target population cannot establish a bound without a defensible mapping.
 Report issue NAME --review REVIEW --method strategy:FORK/mixture freezes the
 headline from the selected run. --coverages .8,.9 labels p10–p90 and p5–p95.
+Issuance status comes from review.json, not a --status flag on report issue.
+Read the issued presentation: state its population, geography, reference period,
+inclusions/exclusions, and limitations alongside its numbers. Shared evidence
+remains a finding in issued reports even when acknowledged. Unresolved evidence,
+ratio conflicts, or unperformed sensitivity cannot be waived for reviewed issuance.
 Rates with support outside [0,1] block issuance, including provisional issuance.
 Reviewed issuance requires dispositions for all remaining warnings and no material
 research gaps. Record status provisional and disclose remaining_gaps when work
@@ -138,9 +157,25 @@ Calibration evaluate NAME compares raw/adjusted scores on identical events,
 with separate training and test results. Training evidence stays pinned;
 test evidence uses the chosen --revision. Observations before fitting are
 flagged. Repeated selection on test results compromises a holdout interpretation.
-Version 0.7 has no network, inference, or survey execution.
-Scoring does not certify sources or coverage. Historical v0.1–v0.6 projects
-remain readable.
+Version 0.8 has no network, inference, or survey execution.
+Scoring does not certify sources or coverage. Historical v0.1–v0.7 projects
+remain readable. Historical research records retain their original validation
+rules; create a fresh schema-2 review before issuing a new conclusion.
+
+COMMON COMMAND FORMS (replace uppercase names and supplied evidence):
+stanton anchor INPUT --value 100 --source 'SOURCE' --asof 2026-01-01
+stanton relate TARGET --fork FORK = 'INPUT * RATE'
+stanton note TARGET 'Substantive research findings, gaps, and stopping rationale'
+stanton sample TARGET --seed 0
+stanton research template TARGET --output review.json
+stanton schema research_review
+stanton research check --from review.json
+stanton research review REVIEW_NAME --from review.json
+stanton report issue REPORT_NAME --review REVIEW_NAME --method mixture --coverages .8,.9
+stanton report show REPORT_NAME
+stanton report context TARGET
+Use --project PATH on these commands. Note text is positional; anchor --asof is
+required. Report context takes a target quantity; report show takes a report name.
 """
 
 
@@ -189,7 +224,7 @@ def next_actions(session):
                         tasks.append({"kind": "record_research_review", "target": node, "run_id": run["id"],
                                       "description": "Create research template, fill it from actual evidence, and save research review before report issue.",
                                       "schema": "research_review", "argv": root + ["schema", "research_review"],
-                                      "required_inputs": ["new template output path", "source mappings and research findings", "saved sensitivity runs or concrete not-applicable reason", "review name"],
+                                      "required_inputs": ["new template output path", "source mappings and research findings", "saved sensitivity runs or explicit omission status/reason", "review name"],
                                       "mutates": False, "network": False})
                     elif not any(r["run_id"] == run["id"] for r in state.get("issued_reports", {}).values()):
                         tasks.append({"kind": "issue_report", "target": node, "run_id": run["id"], "reviews": sorted(reviews),

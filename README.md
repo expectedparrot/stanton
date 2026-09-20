@@ -4,13 +4,15 @@ A local numerical estimation workbench for people and agents. Supply estimates
 and their provenance, combine them with unit-aware arithmetic, and preserve the
 resulting uncertainty and revision history.
 
-Version 0.7 implements the first three delivery slices in [DESIGN.md](DESIGN.md):
+Version 0.8 implements the first three delivery slices in [DESIGN.md](DESIGN.md):
 scalar estimation, conditional models, persistent paths, periodic profiles,
 and conserved allocations. The fourth slice now includes bound surveys,
 optional EDSL compilation, reviewed response import, sourced outcomes, and
 scoring of fixed evaluation cohorts, and training-only fitted spread adjustments.
 Run-bound research reviews and issued conclusions now preserve source mappings,
 sensitivity comparisons, warning dispositions, and explicitly labeled intervals.
+Issued presentations include scope and dates; shared evidence and omitted
+sensitivity tests remain visible, and unresolved evidence forces provisional status.
 The broader product proposal is in [spec.md](spec.md).
 
 ## Install from GitHub

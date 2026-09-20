@@ -3,6 +3,7 @@
 from copy import deepcopy
 
 from .common import digest, identifier, name, now, require
+from .research_checks import presentation
 from .research_records import evidence_digest, issuance_data, review_data, review_template
 
 
@@ -22,11 +23,14 @@ class ResearchOperations:
             require(record_name not in records, "Research records are immutable; choose a new name.")
             current["schema_version"] = 7
             records[record_name] = record
-            warnings = deepcopy(record.get("findings", record.get("unresolved_findings", [])))
-            if record.get("status") == "provisional":
-                warnings.append({"code": "provisional-result", "message": "Issued as provisional; inspect remaining gaps and unresolved findings."})
+            warnings = presentation(record)
             return {"record": deepcopy(record), "warnings": warnings}
         return self._edit("research-review" if registry == "research_reviews" else "report-issue", mutate)
+
+    def research_check(self, document):
+        state, revision = self.store.read()
+        data = review_data(document, state, revision, self.store.run, lambda r: self.store.read(r)[0], now())
+        return {"review": data, "warnings": data["findings"], "mutates": False}
 
     def research_review(self, review_name, document):
         state, revision = self.store.read()
@@ -46,7 +50,7 @@ class ResearchOperations:
         require(record_name in state.get(registry, {}), "Unknown research record.", "not_found")
         record = state[registry][record_name]
         current_basis = evidence_digest(state) == record["basis_sha256"]
-        warnings = deepcopy(record.get("findings", record.get("unresolved_findings", [])))
+        warnings = presentation(record, state.get("research_reviews", {}).get(record.get("review")))
         if not current_basis:
             warnings.append({"code": "stale-research-record", "message": "This historical record is unchanged, but current model or evidence differs; sample and review again for a current conclusion."})
         return {"record": record, "working_revision": revision, "current_basis": current_basis, "warnings": warnings}

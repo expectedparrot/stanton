@@ -33,7 +33,10 @@ rationale, and append a substantive summary to the target's Stanton notes before
 saving the final run. Then save a structured `research review` and use
 `report issue` to freeze the conclusion from that run. Use the guide and
 `research template` for exact commands and required fields. Read `report context`
-before final narration; use the issued headline and labeled intervals. A successful
+before final narration; use the issued presentation, including scope, reference
+period, exclusions, limitations, and labeled intervals. Use `research check` to
+inspect new findings before saving a review. Unperformed sensitivity and
+unresolved evidence are gaps, not acknowledgments that can be waived. A successful
 sample, lint, validation, or report export is not a research-quality check.
 
 Seek independent source families, investigate contradictions, attempt an

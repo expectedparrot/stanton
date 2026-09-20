@@ -1,7 +1,7 @@
 # Stanton implementation design
 
 Review of `spec.md` v0.4 and neighboring packages, 2026-09-19.
-This is the implementation contract and delivery plan. Version 0.7 implements
+This is the implementation contract and delivery plan. Version 0.8 implements
 the first three slices; see `README.md`, `docs/conditional-models.md`, and
 `docs/paths-and-allocations.md` for shipped behavior and limits.
 It also implements elicitation, outcome evaluation, and scalar spread calibration
@@ -349,3 +349,21 @@ advisory provenance warnings versus invalid-state errors, including whether
 missing reasons are accepted as draft records. Mark the survey/definition
 drafts, unsupported calibration options, and unresolved sampling schemes by
 delivery status so proposed commands are not mistaken for shipped behavior.
+
+
+### Research review engine v2 (0.8)
+
+State schema 7 and numerical run schema 3 are unchanged. Research review engine
+v2 adds structured scope/reference periods, temporal mappings, discrepancy
+records, numeric share checks, and conceptual input dependencies. Omitted
+sensitivity and unresolved evidence require provisional issuance regardless of
+warning dispositions. Not-applicable sensitivity requires deterministic inputs
+and an explanation; this mechanical condition does not certify the explanation.
+Detected shared evidence persists in findings and issued presentation limitations.
+`research check` previews findings without recording a revision.
+
+Engine-v1 records replay using their historical rules. Their read-only wrappers
+add current warnings; new issuance requires an engine-v2 review. Archive checks
+recompute issued scope/presentation and findings as well as numerical results.
+The CLI uses intermixed parsing for `relate` so flags can interrupt positionals
+on Python 3.11 as well as 3.12; CI exercises both interpreter versions.

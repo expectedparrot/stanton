@@ -19,7 +19,23 @@ from .session import Session
 
 class Parser(argparse.ArgumentParser):
     def error(self, message):
+        if "--asof" in message:
+            message += " Example: stanton anchor NAME --value 100 --source 'SOURCE' --asof 2026-01-01"
+        elif "--text" in message:
+            message += " Note text is positional: stanton note TARGET 'RESEARCH SUMMARY'"
+        elif "--status" in message:
+            message += " For report issue, status comes from review.json; set its status to provisional or reviewed, then save a new research review."
         raise StantonError(message, "invalid_arguments")
+
+    def parse_known_args(self, args=None, namespace=None):
+        # Python 3.11 otherwise loses nargs='*' positionals after an option.
+        if getattr(self, "intermixed", False) and not getattr(self, "_parsing_intermixed", False):
+            self._parsing_intermixed = True
+            try:
+                return self.parse_known_intermixed_args(args, namespace)
+            finally:
+                self._parsing_intermixed = False
+        return super().parse_known_args(args, namespace)
 
 
 def csv(text, cast=str):
@@ -151,6 +167,7 @@ def parser():
     p.add_argument("--source", required=True)
     p.add_argument("--reason", default="")
     p = add("relate")
+    p.intermixed = True
     p.add_argument("target")
     p.add_argument("expression", nargs="*")
     p.add_argument("--fork", default="main")
@@ -308,6 +325,8 @@ def parser():
     p.add_argument("--output", required=True)
     p = sub.add_parser("review", parents=[shared])
     p.add_argument("name")
+    p.add_argument("--from", dest="input", required=True)
+    p = sub.add_parser("check", parents=[shared])
     p.add_argument("--from", dest="input", required=True)
     p = sub.add_parser("show", parents=[shared])
     p.add_argument("name")
@@ -514,6 +533,8 @@ def dispatch(args):
         require(1 <= len(parts) <= 2 and all(parts), "Use TARGET or TARGET@DEFINITION.")
         return session.check(args.claim, parts[0], definition=parts[1] if len(parts) == 2 else None, run_id=args.run_id)
     if command == "research":
+        if args.action == "check":
+            return session.research_check(read_json(args.input))
         if args.action == "review":
             return session.research_review(args.name, read_json(args.input))
         if args.action == "show":

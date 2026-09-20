@@ -166,3 +166,28 @@ def test_research_review_walkthrough_in_fresh_processes(tmp_path):
     review = project.research_show("synthetic_review")["record"]
     assert review["sensitivity_results"][0]["results"]["strategy:main"]["variation"]["median"] == 80
     assert issued["record"]["headline"]["intervals"][0]["coverage"] == .8
+
+
+@pytest.mark.parametrize("args", [
+    ["relate", "total", "--fork", "alternate", "=", "x * y"],
+    ["relate", "--fork", "alternate", "total", "=", "x * y"],
+    ["relate", "total", "=", "x * y", "--fork", "alternate"],
+    ["relate", "total", "--fork", "alternate", "x * y", "--project", "study"],
+])
+def test_relate_options_can_precede_follow_or_interrupt_positionals(args):
+    # Run on Python 3.11 as well as 3.12: ordinary argparse behavior differs.
+    from stanton.cli import parser
+    parsed = parser().parse_args(args)
+    assert parsed.target == "total" and parsed.fork == "alternate"
+    assert " ".join(parsed.expression).removeprefix("= ") == "x * y"
+
+
+def test_field_session_errors_give_corrective_commands(tmp_path, capsys):
+    from stanton.cli import main
+    for args, text in [
+        (["anchor", "x", "--value", "100", "--source", "Fixture"], "--asof 2026-01-01"),
+        (["note", "x", "--text", "Finding"], "stanton note TARGET"),
+        (["report", "issue", "answer", "--review", "review", "--status", "provisional"], "status comes from review.json"),
+    ]:
+        assert main(args) == 1
+        assert text in json.loads(capsys.readouterr().err)["errors"][0]["message"]

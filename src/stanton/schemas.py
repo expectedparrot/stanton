@@ -45,10 +45,10 @@ SCHEMAS["research_review"] = {
                     "properties": {**{k: _REVIEW_TEXT for k in _SOURCE_TEXT_FIELDS},
                                    "applies_to": {"type": "array", "minItems": 1, "items": _REVIEW_TEXT},
                                    "ancestry": {"type": "array", "items": _REVIEW_TEXT}}}},
-        "sensitivity": {"type": "object", "required": ["comparisons", "not_applicable_reason"], "properties": {
+        "sensitivity": {"type": "object", "required": ["status", "comparisons", "reason"], "properties": {
             "comparisons": {"type": "array", "items": {"type": "object", "required": ["baseline_run", "variation_run", "reason"],
                             "properties": {k: _REVIEW_TEXT for k in ("baseline_run", "variation_run", "reason")}}},
-            "not_applicable_reason": {"type": "string"}}},
+            "status": {"enum": ["performed", "not_performed", "not_applicable"]}, "reason": _REVIEW_TEXT}},
         "stopping": {"type": "object", "required": ["reason", "remaining_gaps"], "properties": {
             "reason": _REVIEW_TEXT, "remaining_gaps": {"type": "array", "items": _REVIEW_TEXT}}},
         "warning_dispositions": {"type": "array", "items": {"type": "object", "required": ["warning_id", "reason"],
@@ -57,6 +57,36 @@ SCHEMAS["research_review"] = {
     },
     "description": "Run-bound agent review. Reviewed status requires sources, searches, no remaining material gaps, and warning dispositions before issuance. Sensitivity comparisons need changed numerical inputs or a concrete not-applicable reason. Source truth and research sufficiency are not certified."
 }
+
+_DATE_WINDOW = {"type": "object", "required": ["start", "end"],
+                "properties": {k: {"type": "string", "format": "date"} for k in ("start", "end")}}
+_scope_fields = ("population", "geography", "counting_unit", "inclusions", "exclusions", "interpretation")
+_review = SCHEMAS["research_review"]
+_review["required"] += ["schema_version", "scope_details", "discrepancies", "numeric_checks", "input_dependencies"]
+_review["properties"].update({
+    "schema_version": {"const": 2},
+    "scope_details": {"type": "object", "required": [*_scope_fields, "reference_period"],
+                      "properties": {**{k: _REVIEW_TEXT for k in _scope_fields}, "reference_period": _DATE_WINDOW}},
+    "discrepancies": {"type": "array", "items": {"type": "object", "required": ["id", "claim", "status", "source_ids", "explanation"],
+                      "properties": {**{k: _REVIEW_TEXT for k in ("id", "claim", "explanation", "evidence")},
+                                     "status": {"enum": ["resolved", "unresolved"]},
+                                     "source_ids": {"type": "array", "items": _REVIEW_TEXT}}}},
+    "numeric_checks": {"type": "array", "items": {"type": "object",
+                       "required": ["id", "source_id", "numerator", "denominator", "reported_ratio", "denominator_population", "explanation"],
+                       "properties": {**{k: _REVIEW_TEXT for k in ("id", "source_id", "denominator_population", "explanation")},
+                                      "numerator": {"type": "number", "minimum": 0}, "denominator": {"type": "number", "exclusiveMinimum": 0},
+                                      "reported_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+                                      "tolerance": {"type": "number", "minimum": 0, "maximum": .01, "default": .0001}}}},
+    "input_dependencies": {"type": "array", "items": {"type": "object", "required": ["quantity", "depends_on", "reason"],
+                           "properties": {"quantity": _REVIEW_TEXT, "reason": _REVIEW_TEXT,
+                                          "depends_on": {"type": "array", "minItems": 1, "items": _REVIEW_TEXT}}}},
+})
+_source = _review["properties"]["sources"]["items"]
+_source["required"] += ["observation_window", "temporal_status", "temporal_mapping"]
+_source["properties"].update(observation_window={"anyOf": [_DATE_WINDOW, {"type": "null"}]},
+                             temporal_status={"enum": ["aligned", "adjusted", "unresolved", "unknown"]},
+                             temporal_mapping=_REVIEW_TEXT, temporal_evidence=_REVIEW_TEXT)
+_review["description"] = "Schema 2 run-bound research review. Missing sensitivity and unresolved evidence require provisional issuance even if acknowledged. Not-applicable sensitivity is restricted to deterministic models and requires justification. Resolved discrepancies and time adjustments require supporting evidence. Source truth and research sufficiency remain agent judgments."
 
 SCHEMAS["quantity"]["properties"]["predicates"] = {"type": "object", "additionalProperties": {"type": "boolean"}}
 SCHEMAS["estimate"]["properties"].update(given={"type": ["string", "null"]}, definition_id={"type": ["string", "null"]})

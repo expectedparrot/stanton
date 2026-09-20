@@ -1,6 +1,6 @@
 # Research reviews and issued conclusions
 
-Stanton 0.7 adds an explicit path from research to an issued numerical conclusion:
+Stanton 0.8 provides an explicit path from research to an issued numerical conclusion:
 
 ```text
 research → model → saved sensitivity runs → final notes/model → final run
@@ -51,6 +51,12 @@ review = json.loads(path.read_text())
 review.update(
     status="reviewed",
     scope="Synthetic unique firms in one fixture period; repeated listings excluded.",
+    scope_details={
+        "population": "Synthetic unique commercial firms", "geography": "United States",
+        "counting_unit": "count", "inclusions": "Paid users", "exclusions": "Government, education, nonprofits, free-only accounts",
+        "interpretation": "US-headquartered legal entities, not locations",
+        "reference_period": {"start": "2026-01-01", "end": "2026-12-31"}
+    },
     searches=[{"query": "Inspect synthetic register fixture", "outcome": "100 unique synthetic firms; no external search claimed."}],
     sources=[{
         "id": "register", "reference": "Synthetic register fixture, not a real publication",
@@ -58,7 +64,9 @@ review.update(
         "target_mapping": "Same population as target; form share supplied as judgment, not observed.",
         "method": "Complete synthetic register", "limitations": "No empirical generalization",
         "publication_date": "Not applicable: synthetic", "observation_period": "Synthetic fixture period",
-        "accessed_at": "Not applicable: synthetic", "applies_to": ["population"], "ancestry": ["fixture"]
+        "accessed_at": "Not applicable: synthetic", "applies_to": ["population"], "ancestry": ["fixture"],
+        "observation_window": {"start": "2026-01-01", "end": "2026-12-31"},
+        "temporal_status": "aligned", "temporal_mapping": "Same synthetic reference period"
     }],
     reconciliation="No competing measurements in this fixture. Population is a count; rate is a modeled assumption.",
     alternative_model="No second data-generating process exists in the fixture; duplicating the formula would not corroborate it.",
@@ -68,11 +76,12 @@ review.update(
         "baseline_run": json.loads(Path("baseline.json").read_text())["data"]["run_id"],
         "variation_run": json.loads(Path("sensitivity.json").read_text())["data"]["run_id"],
         "reason": "Stress the eligible share at .8, holding the population fixed."
-    }], "not_applicable_reason": ""},
+    }], "status": "performed", "reason": "Test the consequence of a higher form share"},
     stopping={"reason": "Synthetic API demonstration complete; no real-world finding is asserted.", "remaining_gaps": []},
 )
 path.write_text(json.dumps(review, indent=2) + "\n")
 PY
+stanton --project reviewed-study research check --from review.json
 stanton --project reviewed-study research review synthetic_review --from review.json
 stanton --project reviewed-study research show synthetic_review
 stanton --project reviewed-study report issue synthetic_answer --review synthetic_review --method strategy:main --coverages .8,.9
@@ -93,18 +102,21 @@ narratives fail validation; filling fields does not certify their truth.
 
 | Field | What to record |
 | --- | --- |
-| `scope` | Geography, time, entity definition, inclusion and repeat-counting rules. |
+| `scope` and `scope_details` | Narrative plus structured population, geography, counting unit, inclusions, exclusions, interpretation, and reference period with ISO start/end dates. |
 | `searches` | Actual queries/investigations and their findings, failures, or access limits. |
 | `sources` | Reference, claim, measured population, method, dates, limitations, ancestry, and model quantities under `applies_to`. |
 | Source `target_mapping` | Explain how the measured population informs the requested population, including selection bias and deduplication. |
-| `reconciliation` | Contradictions, attempted resolutions, remaining implications. |
+| `reconciliation` and `discrepancies` | Contradictions, attempted resolutions, remaining implications. A resolved discrepancy requires supporting `evidence`. |
+| `numeric_checks` | Source numerator, denominator, denominator population, and reported ratio as a fraction; arithmetic mismatches become research gaps. |
+| Source timing | `observation_window`, `temporal_status`, `temporal_mapping`, and `temporal_evidence` for adjustments. Unknown dates are explicit gaps. |
+| `input_dependencies` | Quantity, `depends_on` quantities, and reason when a judgment borrows another input’s evidence, even if their graph leaves differ. |
 | `alternative_model` | Different estimation routes or concrete reasons an attempted alternative is unsupported. |
 | `dependence` | Shared data, assumptions, and conceptual derivations across strategies. |
 | `uncertainty` | Reasons for distributions, mixture weights, and their interpretation. |
 | `sensitivity.comparisons` | `baseline_run`, `variation_run`, and `reason`; results are computed from saved draws. |
-| `sensitivity.not_applicable_reason` | Concrete reason when no sensitivity test is applicable; never invent a comparison. |
+| `sensitivity.status` and `reason` | `performed` with actual comparisons; `not_performed` records a gap; `not_applicable` requires a deterministic model and justification. |
 | `stopping` | Specific stopping `reason` and a list of material `remaining_gaps`. |
-| `warning_dispositions` | One `warning_id` and substantive `reason` for each retained warning. IDs come from template `available_findings`. |
+| `warning_dispositions` | One `warning_id` and substantive `reason` for each retained warning. Preview all IDs with `research check --from review.json` after filling the evidence fields. |
 
 Write unknown dates and unavailable methods explicitly. There is no source quota;
 `reviewed` requires a nonempty source ledger and search log, while a provisional
@@ -113,8 +125,9 @@ to at least one known quantity. The application cannot decide whether a mapping
 is defensible: a count of directory listings is not automatically a lower bound
 on unique firms.
 
-Reviews compute pairwise shared leaves, source IDs, and declared ancestry across
-strategies. They retain the agent's dependence explanation alongside these
+Reviews compute pairwise shared leaves, source IDs, declared ancestry, and input
+evidence dependencies across strategies. Detected overlap becomes a prominent
+finding and remains visible in issued reports even when acknowledged. They retain the agent's dependence explanation alongside these
 checks. No detected overlap does **not** establish independence: one prior may
 have been derived from another without a shared variable or citation.
 
@@ -130,7 +143,9 @@ empirically justified. The review must explain that judgment.
 ## Issuance rules
 
 - `reviewed` is the agent's declaration. Issuance requires no material gaps and
-  a disposition for every remaining warning. Stanton does not certify research
+  a disposition for every remaining warning. Unperformed sensitivity, unresolved
+  discrepancies, inconsistent ratios, and unknown/unreconciled source dates force
+  provisional issuance even if their warnings have dispositions. Stanton does not certify research
   depth, source truth, representativeness, independence, or calibration.
 - `provisional` preserves unresolved warnings and material gaps in the issued
   record. It does not waive invalid rate support, incompatible units, or invalid
@@ -161,3 +176,43 @@ empirically justified. The review must explain that judgment.
 `save` bundles structured reviews and issued conclusions. It does not bundle
 arbitrary files such as web pages or `RESEARCH.md`. Keep substantive findings in
 notes and review fields, and preserve source artifacts separately where useful.
+
+
+## Scope, discrepancies, and skipped work in schema 2
+
+Use the issued `presentation` when writing the final answer. It includes the
+status, population, geography, reference period, inclusions/exclusions, labeled
+intervals, and limitations. Do not strip those fields away when reporting the
+number. A historical estimate using later observations needs a supported temporal
+mapping; access date alone does not establish when the population was measured.
+A source window extending outside the target period cannot be declared aligned.
+
+`research check --from review.json` is read-only. It reports newly computed
+findings before the agent saves an immutable review. Include the relevant finding
+IDs and substantive reasons in `warning_dispositions` for acknowledged limitations.
+Dispositions do not remove shared evidence from the final report or turn research
+gaps into completed work. A provisional result must retain those gaps.
+
+For example, this numeric check surfaces an unexplained denominator conflict:
+
+```json
+{
+  "id": "us_share_check", "source_id": "S5",
+  "numerator": 41009, "denominator": 82255, "reported_ratio": 0.6191,
+  "denominator_population": "All reported global detections",
+  "explanation": "The geography percentage may use a smaller subset; not established."
+}
+```
+
+The calculated ratio is about 0.4986. An unverified smaller-denominator hypothesis
+does not resolve the mismatch. Reconcile the population and record the correct
+inputs and evidence, or retain provisional status. Tolerance is for rounding only
+(default 0.0001, maximum 0.01), not a way to waive an unexplained discrepancy.
+Similarly, a global detection count containing foreign entities or nonprofits
+cannot establish a lower bound for US commercial paid users without a supported
+population mapping. Record unresolved mapping problems in `discrepancies`.
+
+Schema-1 reviews and reports remain readable and validate under their historical
+engine. Reading them adds current warnings without changing the records. New
+issuance requires a new schema-2 review. Sources, discrepancies, and narratives
+remain agent-supplied evidence; the tool cannot establish their truth.

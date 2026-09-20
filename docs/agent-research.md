@@ -18,8 +18,11 @@ automatically.
 The contract lives in `src/stanton/research.py`. All three CLI surfaces use it.
 The guidance contract keeps research quality `not_assessed`: the application
 cannot establish whether the agent actually investigated the evidence. Version
-0.7 separately records agent-declared `reviewed` or `provisional` status in
-immutable run-bound research reviews. These are declarations with mechanical
+0.8 separately records agent-declared `reviewed` or `provisional` status in
+immutable run-bound research reviews. Schema-2 reviews distinguish performed,
+unperformed, and inapplicable sensitivity work and require explicit scope and
+source observation dates. Detected shared evidence and unresolved discrepancies
+remain visible in issued presentations. These are declarations with mechanical
 checks, not an assessment of research quality. A
 successful `sample`, `validate`, or report export must never be described as
 verification of research quality. The agent must perform and document the review.

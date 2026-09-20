@@ -96,11 +96,16 @@ def audit(state, revision, target, run=None):
 
 
 def report_context(session, target, run_id=None):
-    run = session.store.run(run_id, target)
     state, _ = session.store.read()
+    require(target not in state.get("issued_reports", {}) or target in state["quantities"],
+            f"{target} is an issued report name. Use stanton report show {target}; report context expects the target quantity.", "wrong_report_identifier")
+    run = session.store.run(run_id, target)
     result = session.show(target, run_id=run["id"])
     issued = {key: record for key, record in state.get("issued_reports", {}).items() if record["run_id"] == run["id"]}
     warnings = list(result["warnings"])
+    from .research_checks import presentation
+    for record in issued.values():
+        warnings += presentation(record, state.get("research_reviews", {}).get(record["review"]))
     if not issued:
         warnings.append({"code": "unissued-result", "message": "Draft numerical context; record a research review and use report issue before presenting a completed conclusion."})
     return {"summary": result, "audit": session.audit(target, run_id=run["id"]),
@@ -112,6 +117,7 @@ def report_context(session, target, run_id=None):
             "issued_reports": issued,
             "instructions": ["Apply the attached agent research contract before final synthesis or a polished report. Review the study's RESEARCH.md and frozen target notes; this export does not assess research completion. If material work remains incomplete, disclose it and label the result provisional.",
                              "Use report issue to freeze a conclusion after research review. Until issuance, this context is draft material. Copy labeled central model intervals exactly: p5–p95 is 90%, p10–p90 is 80%. Never replace the computed headline with an unmodeled judgment; revise, sample, and review it.",
+                             "Use the issued presentation with its scope and reference period, not an unqualified numerical headline. Include shared evidence, unperformed sensitivity, unresolved discrepancies, and provisional status even when a warning has a disposition.",
                              "Keep per-strategy results and disagreement visible.",
                              "Keep decision and definition branches separate; they have no probabilities or blended result.",
                              "Distinguish supplied sources, judgmental assumptions, and computed values.",

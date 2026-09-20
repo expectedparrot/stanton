@@ -10,7 +10,8 @@ from .reports import reported_summary
 from .schemas import graph_order
 from .scoring import forecast_binding, forecast_samples, timestamp
 
-ENGINE = "stanton.research-review.v1"
+LEGACY_ENGINE = "stanton.research-review.v1"
+ENGINE = "stanton.research-review.v2"
 HARD_ERRORS = {"support-outside-rate", "unit-mismatch", "incomplete-scenarios"}
 SOURCE_FIELDS = ("id", "reference", "claim", "population", "target_mapping", "method", "limitations",
                  "publication_date", "observation_period", "accessed_at")
@@ -29,7 +30,7 @@ def run_findings(run, frozen):
     return list(findings.values())
 
 
-def dependency_overlap(run, state, sources):
+def dependency_overlap(run, state, sources, dependencies=None):
     orders = {fork: set(graph_order(state, fork, run["target"])) for fork in run["forks"]}
     for nodes in orders.values():
         for node in list(nodes):
@@ -40,14 +41,25 @@ def dependency_overlap(run, state, sources):
                     nodes.add(series["growth"])
     leaves = {fork: {n for n in nodes if n not in state["graphs"][fork] and not state["quantities"][n].get("process")}
               for fork, nodes in orders.items()}
+    evidence_nodes = {fork: set(nodes) for fork, nodes in orders.items()}
+    for nodes in evidence_nodes.values():
+        changed = True
+        while changed:
+            before = len(nodes)
+            for dependency in dependencies or []:
+                if dependency["quantity"] in nodes:
+                    nodes.update(dependency["depends_on"])
+            changed = len(nodes) != before
     origins, references = {}, {}
     for fork, nodes in leaves.items():
+        nodes = evidence_nodes[fork] if dependencies is not None else nodes
         estimates = [state["estimates"][n] for n in nodes if n in state["estimates"]]
         estimates += [e for n in nodes for e in state.get("conditional_estimates", {}).get(n, {}).values()]
         origins[fork] = {a for e in estimates for a in e["ancestry"]}
-        references[fork] = {s["id"] for s in sources if set(s["applies_to"]) & orders[fork]}
+        references[fork] = {s["id"] for s in sources if set(s["applies_to"]) & evidence_nodes[fork]}
         origins[fork].update(a for s in sources if s["id"] in references[fork] for a in s["ancestry"])
     return [{"strategies": [a, b], "shared_leaves": sorted(leaves[a] & leaves[b]),
+             **({"shared_evidence_quantities": sorted((evidence_nodes[a] & evidence_nodes[b]) - {run["target"]})} if dependencies is not None else {}),
              "shared_ancestry": sorted(origins[a] & origins[b]),
              "shared_source_ids": sorted(references[a] & references[b]),
              "interpretation": "Detected overlap is not independent corroboration; absent overlap does not establish independence."}
@@ -55,15 +67,25 @@ def dependency_overlap(run, state, sources):
 
 
 def review_template(run, state):
-    return {"run_id": run["id"], "status": "provisional", "scope": "", "searches": [], "sources": [],
+    return {"schema_version": 2, "run_id": run["id"], "status": "provisional", "scope": "",
+            "scope_details": {"population": "", "geography": "", "counting_unit": state["quantities"][run["target"]]["units"],
+                              "inclusions": "", "exclusions": "", "interpretation": "",
+                              "reference_period": {"start": "", "end": ""}},
+            "discrepancies": [], "numeric_checks": [], "input_dependencies": [], "searches": [], "sources": [],
             "reconciliation": "", "alternative_model": "", "dependence": "", "uncertainty": "",
-            "sensitivity": {"comparisons": [], "not_applicable_reason": ""},
+            "sensitivity": {"status": "not_performed", "comparisons": [], "reason": ""},
             "stopping": {"reason": "", "remaining_gaps": []}, "warning_dispositions": [],
             "available_findings": run_findings(run, state)}
 
 
-def validate_document(document, state):
+def validate_document(document, state, engine=ENGINE):
     require(isinstance(document, dict), "Research review must be an object.")
+    if engine == ENGINE:
+        required = {"schema_version", "run_id", "status", "scope", "scope_details", "searches", "sources", "reconciliation",
+                    "alternative_model", "dependence", "uncertainty", "sensitivity", "stopping", "warning_dispositions",
+                    "discrepancies", "numeric_checks", "input_dependencies"}
+        missing = sorted(required - document.keys())
+        require(not missing, "Missing review fields: " + ", ".join(missing) + ". Fill a fresh research template; see stanton schema research_review.")
     require(document.get("status") in {"reviewed", "provisional"}, "Review status must be reviewed or provisional.")
     for field in ("run_id", "scope", "reconciliation", "alternative_model", "dependence", "uncertainty"):
         nonblank(document.get(field), field)
@@ -90,9 +112,10 @@ def validate_document(document, state):
             nonblank(origin, "Ancestry")
     sensitivity = document.get("sensitivity")
     require(isinstance(sensitivity, dict) and isinstance(sensitivity.get("comparisons"), list), "Supply sensitivity comparisons.")
-    require(isinstance(sensitivity.get("not_applicable_reason"), str), "Supply sensitivity not_applicable_reason (empty when tested).")
-    require(sensitivity["comparisons"] or sensitivity["not_applicable_reason"].strip(),
-            "Reference actual sensitivity runs or explain why sensitivity is not applicable.")
+    if engine == LEGACY_ENGINE:
+        require(isinstance(sensitivity.get("not_applicable_reason"), str), "Supply sensitivity not_applicable_reason (empty when tested).")
+        require(sensitivity["comparisons"] or sensitivity["not_applicable_reason"].strip(),
+                "Reference actual sensitivity runs or explain why sensitivity is not applicable.")
     for comparison in sensitivity["comparisons"]:
         require(isinstance(comparison, dict), "Sensitivity comparison must be an object.")
         for field in ("baseline_run", "variation_run", "reason"):
@@ -114,6 +137,9 @@ def validate_document(document, state):
             nonblank(entry.get(field), "Disposition " + field)
         require(entry["warning_id"] not in seen, "Duplicate warning disposition.")
         seen.add(entry["warning_id"])
+    if engine == ENGINE:
+        from .research_checks import validate_review_fields
+        validate_review_fields(document, state)
 
 
 def strip_provenance(value):
@@ -168,24 +194,30 @@ def sensitivity_results(document, get_run, get_state, final_run, recorded_at):
     return results
 
 
-def review_data(document, state, revision, get_run, get_state, recorded_at):
-    validate_document(document, state)
+def review_data(document, state, revision, get_run, get_state, recorded_at, *, engine=ENGINE):
+    validate_document(document, state, engine)
     run = get_run(document["run_id"])
     frozen = get_state(run["revision"])
     require(run["revision"] <= revision and timestamp(run["created_at"]) <= timestamp(recorded_at), "Review cannot precede its run.")
     require(evidence_digest(state) == evidence_digest(frozen), "Model or evidence changed after this run. Sample again before review.", "stale_run")
+    overlap = dependency_overlap(run, frozen, document["sources"], document["input_dependencies"] if engine == ENGINE else None)
     findings = run_findings(run, frozen)
+    if engine == ENGINE:
+        from .research_checks import research_findings
+        findings += research_findings(document, run, frozen, overlap)
     require({d["warning_id"] for d in document["warning_dispositions"]} <= {f["id"] for f in findings}, "Disposition references an unknown warning.")
-    return {"engine": ENGINE, "document": deepcopy(document), "target": run["target"], "run_id": run["id"],
+    return {"engine": engine, "document": deepcopy(document), "target": run["target"], "run_id": run["id"],
             "run_sha256": digest(run), "basis_sha256": evidence_digest(frozen), "reviewed_revision": revision,
-            "findings": findings, "dependency_overlap": dependency_overlap(run, frozen, document["sources"]),
+            "findings": findings, "dependency_overlap": overlap,
             "sensitivity_results": sensitivity_results(document, get_run, get_state, run, recorded_at),
             "verification": "Structure, run bindings, and computed comparisons checked; source truth, population mappings, independence, and research sufficiency remain agent judgments."}
 
 
-def issuance_data(state, revision, review_name, get_run, get_state, *, method=None, coverages=(.8, .9), definition=None, decisions=None):
+def issuance_data(state, revision, review_name, get_run, get_state, *, method=None, coverages=(.8, .9), definition=None, decisions=None, engine=ENGINE):
     require(review_name in state.get("research_reviews", {}), "Unknown research review.", "not_found")
     review = state["research_reviews"][review_name]
+    if engine == ENGINE:
+        require(review["engine"] == ENGINE, "This review predates explicit scope and sensitivity checks. Create a new research template and review before issuing a new conclusion.", "legacy_review")
     run = get_run(review["run_id"])
     require(evidence_digest(state) == review["basis_sha256"], "Model or evidence changed. Sample and record a new review before issuing.", "stale_run")
     findings = review["findings"]
@@ -194,6 +226,9 @@ def issuance_data(state, revision, review_name, get_run, get_state, *, method=No
     handled = {d["warning_id"] for d in review["document"]["warning_dispositions"]}
     unresolved = [f for f in findings if f["id"] not in handled]
     if review["document"]["status"] == "reviewed":
+        if engine == ENGINE:
+            require(not any(f.get("requires_provisional") for f in findings),
+                    "Unperformed sensitivity or unresolved source evidence requires provisional status, even if acknowledged. Resolve the gap or save a provisional review.", "research_incomplete")
         require(not unresolved, "Resolve or explicitly justify every remaining warning before reviewed issuance; use a provisional review for incomplete work.", "unresolved_findings")
     binding = forecast_binding(run, get_state(run["revision"]), definition=definition, decisions=decisions)
     entries = forecast_samples(run, binding)
@@ -202,7 +237,22 @@ def issuance_data(state, revision, review_name, get_run, get_state, *, method=No
         method = next(iter(entries))
     require(method in entries, "Unknown issued method for this context.", "not_found")
     summaries = {key: reported_summary(values, coverages=coverages) for key, values in entries.items()}
-    return {"engine": ENGINE, "issued_revision": revision, "review": review_name, "review_id": review["id"],
+    extra = {}
+    if engine == ENGINE:
+        doc = review["document"]
+        scope = {"model_definition": binding["scope"]["quantity"]["definition"], "agent_scope": doc["scope"], **deepcopy(doc["scope_details"])}
+        gaps = [f for f in findings if f.get("requires_provisional")]
+        limitations = [*doc["stopping"]["remaining_gaps"], *[f["message"] for f in findings]]
+        period = scope["reference_period"]
+        extra = {"scope": scope, "findings": findings, "research_gaps": gaps,
+                 "dependency_overlap": review["dependency_overlap"], "sensitivity": doc["sensitivity"],
+                 "discrepancies": doc["discrepancies"], "numeric_checks": doc["numeric_checks"],
+                 "presentation": {
+                     "headline": f"{doc['status'].capitalize()} estimate: {summaries[method]['median']:,.6g} {run['units']}. Population: {scope['population']}. Geography: {scope['geography']}. Reference period: {period['start']} to {period['end']}.",
+                     "inclusions": scope["inclusions"], "exclusions": scope["exclusions"], "interpretation": scope["interpretation"],
+                     "intervals": summaries[method]["intervals"], "limitations": limitations,
+                     "instruction": "Present the status, population, geography, reference period, inclusions/exclusions, and limitations alongside these numbers."}}
+    return {"engine": engine, **extra, "issued_revision": revision, "review": review_name, "review_id": review["id"],
             "review_sha256": digest(review), "forecast": binding, "target": run["target"], "run_id": run["id"],
             "basis_sha256": review["basis_sha256"], "status": review["document"]["status"],
             "method": method, "coverages": [i["coverage"] for i in summaries[method]["intervals"]],
@@ -217,12 +267,12 @@ def validate_research_records(state):
         records = state.get(registry, {})
         require(isinstance(records, dict), registry + " must be an object.")
         for key, record in records.items():
-            require(isinstance(record, dict) and record.get("name") == key and record.get("engine") == ENGINE, "Invalid research record identity.")
+            require(isinstance(record, dict) and record.get("name") == key and record.get("engine") in {ENGINE, LEGACY_ENGINE}, "Invalid research record identity.")
             nonblank(record.get("id"), "Record ID")
             timestamp(record.get("created_at"))
             require(record.get("target") in state["quantities"], "Research record has an unknown target.")
             if registry == "research_reviews":
-                validate_document(record.get("document"), state)
+                validate_document(record.get("document"), state, record["engine"])
 
 
 def validate_artifact_history(states, runs):
@@ -247,11 +297,11 @@ def validate_artifact_history(states, runs):
                 require(revision > 1, "Research records cannot appear in the initial revision.")
                 before = states[revision - 2]
                 if registry == "research_reviews":
-                    expected = review_data(record["document"], before, revision - 1, get_run, get_state, record["created_at"])
+                    expected = review_data(record["document"], before, revision - 1, get_run, get_state, record["created_at"], engine=record["engine"])
                 else:
                     expected = issuance_data(before, revision - 1, record["review"], get_run, get_state,
                                              method=record["method"], coverages=record["coverages"],
-                                             definition=record["definition"], decisions=record["decisions"])
+                                             definition=record["definition"], decisions=record["decisions"], engine=record["engine"])
                     require(timestamp(record["created_at"]) >= timestamp(before["research_reviews"][record["review"]]["created_at"]), "Issuance predates review.")
                 require(record == {**expected, **{k: record[k] for k in ("name", "id", "created_at")}},
                         "Research record does not match saved evidence or numerical results.")
