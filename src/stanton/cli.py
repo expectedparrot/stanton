@@ -83,7 +83,7 @@ def parser():
     shape.add_argument("--quantiles", help="Percent:value pairs, e.g. 5:10,50:20,95:40; bounded endpoint tails")
     shape.add_argument("--from", dest="input", help="Complete estimate input JSON; see schema estimate")
     p.add_argument("--p", type=float, default=.8)
-    p.add_argument("--shape", choices=["normal", "lognormal", "logitnormal"], default="lognormal")
+    p.add_argument("--shape", choices=["normal", "lognormal", "logitnormal"], help="Default follows quantity space: linear=normal, log=lognormal, logit=logitnormal")
     p.add_argument("--source", default="")
     p.add_argument("--reason", default="")
     p.add_argument("--method", default="judgment")
@@ -234,6 +234,7 @@ def parser():
         p.add_argument("target")
         p.add_argument("--run", dest="run_id")
         p.add_argument("--quantiles", default="5,25,50,75,95")
+        p.add_argument("--coverages", default=".8,.9", help="Central model interval coverages")
         p.add_argument("--by", choices=["fork", "definition", "decision"], default="fork")
         p.add_argument("--format", choices=["json", "text"], default="json")
     p = add("audit")
@@ -299,12 +300,34 @@ def parser():
     p.add_argument("--reason", required=True)
     p.add_argument("--definition")
     p.add_argument("--decision", action="append", default=[])
+    p = add("research", help="Record run-bound research evidence and inspect review status")
+    sub = p.add_subparsers(dest="action", required=True)
+    p = sub.add_parser("template", parents=[shared])
+    p.add_argument("target")
+    p.add_argument("--run", dest="run_id")
+    p.add_argument("--output", required=True)
+    p = sub.add_parser("review", parents=[shared])
+    p.add_argument("name")
+    p.add_argument("--from", dest="input", required=True)
+    p = sub.add_parser("show", parents=[shared])
+    p.add_argument("name")
+    p = sub.add_parser("status", parents=[shared])
+    p.add_argument("target", nargs="?")
     p = add("report")
     sub = p.add_subparsers(dest="action", required=True)
     p = sub.add_parser("context", parents=[shared])
     p.add_argument("target")
     p.add_argument("--run", dest="run_id")
     p.add_argument("--output")
+    p = sub.add_parser("issue", parents=[shared])
+    p.add_argument("name")
+    p.add_argument("--review", required=True)
+    p.add_argument("--method", help="strategy:FORK or mixture; required if several methods exist")
+    p.add_argument("--coverages", default=".8,.9")
+    p.add_argument("--definition")
+    p.add_argument("--decision", action="append", default=[])
+    p = sub.add_parser("show", parents=[shared])
+    p.add_argument("name")
     for command in ("save", "load"):
         p = add(command)
         p.add_argument("path")
@@ -347,7 +370,7 @@ def dispatch(args):
         return Session.create(getattr(args, "project", args.path), title=args.title, timezone=args.timezone, asof=args.asof).status()
     if command == "version":
         from . import __version__
-        return {"version": __version__, "schema_version": 6, "readable_state_versions": [1, 2, 3, 4, 5, 6]}
+        return {"version": __version__, "schema_version": 7, "readable_state_versions": [1, 2, 3, 4, 5, 6, 7]}
     if command == "guide":
         return {"guide": GUIDE, "research_workflow": research_workflow()}
     if command == "schema":
@@ -404,14 +427,17 @@ def dispatch(args):
     if command == "estimate":
         if args.input:
             require(args.name is None and not any((args.source, args.reason, args.assumes, args.note, args.asof, args.ancestry, args.given, args.definition_id))
-                    and args.method == "judgment" and args.kind == "epistemic" and args.p == .8 and args.shape == "lognormal",
+                    and args.method == "judgment" and args.kind == "epistemic" and args.p == .8 and args.shape is None,
                     "--from supplies the complete estimate; do not combine it with estimate fields.")
             payload = read_json(args.input)
             require(isinstance(payload, dict), "Estimate file must contain an object.")
             return session.estimate(**payload)
         require(args.name is not None, "Estimate requires a quantity name.")
         if args.interval:
-            distribution = Distribution.from_interval(*args.interval, p=args.p, shape=args.shape)
+            state, _ = session.store.read()
+            require(args.name in state["quantities"], "Define the quantity first.", "not_found")
+            shape = args.shape or {"linear": "normal", "log": "lognormal", "logit": "logitnormal"}[state["quantities"][args.name]["space"]]
+            distribution = Distribution.from_interval(*args.interval, p=args.p, shape=shape)
         elif args.value is not None:
             distribution = Distribution.from_point(args.value)
         elif args.samples:
@@ -480,14 +506,32 @@ def dispatch(args):
                              decisions=assignments(",".join(args.decision)), predicate_flips=args.predicate_flips)
         return session.show(args.target, run_id=run["id"])
     if command in {"show", "compare"}:
-        return session.show(args.target, run_id=args.run_id, quantiles=csv(args.quantiles, float))
+        return session.show(args.target, run_id=args.run_id, quantiles=csv(args.quantiles, float), coverages=csv(args.coverages, float))
     if command == "audit":
         return session.audit(args.target, run_id=args.run_id)
     if command == "check":
         parts = args.against.split("@")
         require(1 <= len(parts) <= 2 and all(parts), "Use TARGET or TARGET@DEFINITION.")
         return session.check(args.claim, parts[0], definition=parts[1] if len(parts) == 2 else None, run_id=args.run_id)
+    if command == "research":
+        if args.action == "review":
+            return session.research_review(args.name, read_json(args.input))
+        if args.action == "show":
+            return session.research_show(args.name)
+        if args.action == "status":
+            return session.research_status(args.target)
+        data = session.research_template(args.target, run_id=args.run_id)
+        with Path(args.output).open("x") as f:
+            json.dump(data, f, indent=2, allow_nan=False)
+            f.write("\n")
+        return {"path": str(Path(args.output).resolve()), "run_id": data["run_id"]}
     if command == "report":
+        if args.action == "issue":
+            return session.report_issue(args.name, review=args.review, method=args.method,
+                                        coverages=csv(args.coverages, float), definition=args.definition,
+                                        decisions=assignments(",".join(args.decision)) if args.decision else None)
+        if args.action == "show":
+            return session.research_show(args.name, issued=True)
         data = report_context(session, args.target, args.run_id)
         if args.output:
             with Path(args.output).open("x") as f:
@@ -513,8 +557,10 @@ def render_text(data):
     for label, values in rows:
         quantiles = ", ".join(f"{q}={v:,.4g}" for q, v in values["quantiles"].items())
         lines.append(f"{label}: {quantiles}")
-    if data["newer_working_revision"]:
-        lines.append("Working inputs have changed; sample again to compute a new result.")
+        for interval in values["intervals"]:
+            lines.append(f"  {100 * interval['coverage']:g}% central model interval (p{interval['lower_percentile']:g}–p{interval['upper_percentile']:g}): {interval['lower']:,.4g}–{interval['upper']:,.4g}")
+    if data.get("stale_run"):
+        lines.append("Model or evidence changed; sample again before issuing a current conclusion.")
     for warning in data["warnings"]:
         lines.append(f"Warning [{warning['code']}]: {warning['message']}")
     return "\n".join(lines)

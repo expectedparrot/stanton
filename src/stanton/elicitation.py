@@ -8,7 +8,7 @@ from .expressions import UNITS, unit
 
 RESPONSE_KINDS = {"asker", "human_panel", "llm_panel"}
 SHAPES = {"linear": "normal", "log": "lognormal", "logit": "logitnormal"}
-MODEL_EXCLUSIONS = {"schema_version", "surveys", "notes", "resolutions", "cohorts", "calibrations"}
+MODEL_EXCLUSIONS = {"schema_version", "surveys", "notes", "resolutions", "cohorts", "calibrations", "research_reviews", "issued_reports"}
 
 
 def model_digest(state):

@@ -28,6 +28,36 @@ SCHEMAS = {
         "weights": {"type": "array", "items": {"type": "number", "minimum": 0}}, "reason": {"type": "string"}}},
 }
 
+# Structured review documents use explicit evidence fields, not checklist booleans.
+_REVIEW_TEXT = {"type": "string", "minLength": 1}
+_SOURCE_TEXT_FIELDS = ("id", "reference", "claim", "population", "target_mapping", "method", "limitations",
+                       "publication_date", "observation_period", "accessed_at")
+SCHEMAS["research_review"] = {
+    "type": "object",
+    "required": ["run_id", "status", "scope", "searches", "sources", "reconciliation", "alternative_model",
+                 "dependence", "uncertainty", "sensitivity", "stopping", "warning_dispositions"],
+    "properties": {
+        **{k: _REVIEW_TEXT for k in ("run_id", "scope", "reconciliation", "alternative_model", "dependence", "uncertainty")},
+        "status": {"enum": ["reviewed", "provisional"]},
+        "searches": {"type": "array", "items": {"type": "object", "required": ["query", "outcome"],
+                     "properties": {k: _REVIEW_TEXT for k in ("query", "outcome")}}},
+        "sources": {"type": "array", "items": {"type": "object", "required": [*_SOURCE_TEXT_FIELDS, "applies_to", "ancestry"],
+                    "properties": {**{k: _REVIEW_TEXT for k in _SOURCE_TEXT_FIELDS},
+                                   "applies_to": {"type": "array", "minItems": 1, "items": _REVIEW_TEXT},
+                                   "ancestry": {"type": "array", "items": _REVIEW_TEXT}}}},
+        "sensitivity": {"type": "object", "required": ["comparisons", "not_applicable_reason"], "properties": {
+            "comparisons": {"type": "array", "items": {"type": "object", "required": ["baseline_run", "variation_run", "reason"],
+                            "properties": {k: _REVIEW_TEXT for k in ("baseline_run", "variation_run", "reason")}}},
+            "not_applicable_reason": {"type": "string"}}},
+        "stopping": {"type": "object", "required": ["reason", "remaining_gaps"], "properties": {
+            "reason": _REVIEW_TEXT, "remaining_gaps": {"type": "array", "items": _REVIEW_TEXT}}},
+        "warning_dispositions": {"type": "array", "items": {"type": "object", "required": ["warning_id", "reason"],
+                                 "properties": {k: _REVIEW_TEXT for k in ("warning_id", "reason")}}},
+        "available_findings": {"type": "array", "description": "Template hints only; authoritative findings are recomputed."}
+    },
+    "description": "Run-bound agent review. Reviewed status requires sources, searches, no remaining material gaps, and warning dispositions before issuance. Sensitivity comparisons need changed numerical inputs or a concrete not-applicable reason. Source truth and research sufficiency are not certified."
+}
+
 SCHEMAS["quantity"]["properties"]["predicates"] = {"type": "object", "additionalProperties": {"type": "boolean"}}
 SCHEMAS["estimate"]["properties"].update(given={"type": ["string", "null"]}, definition_id={"type": ["string", "null"]})
 SCHEMAS.update({
@@ -145,7 +175,7 @@ def graph_order(state, fork, target=None, *, excluded=(), all_periods=False):
 
 
 def validate_state(state):
-    require(isinstance(state, dict) and state.get("schema_version") in {1, 2, 3, 4, 5, 6}, "Unsupported state schema.")
+    require(isinstance(state, dict) and state.get("schema_version") in {1, 2, 3, 4, 5, 6, 7}, "Unsupported state schema.")
     canonical(state)
     for field in ("quantities", "estimates", "assumptions", "graphs", "strategies", "bounds", "merges", "notes"):
         require(isinstance(state.get(field), dict), f"State requires {field}.")
@@ -240,6 +270,8 @@ def validate_state(state):
     validate_evaluations(state)
     from .calibration_validation import validate_calibrations
     validate_calibrations(state)
+    from .research_records import validate_research_records
+    validate_research_records(state)
     for key in state["graphs"]:
         name(key)
         require(state["strategies"][key]["status"] in {"active", "merged", "abandoned"}, "Unknown strategy status.")

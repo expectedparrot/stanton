@@ -219,7 +219,7 @@ def test_schema_version_does_not_downgrade_after_process_edits(s):
     base_path(s)
     s.scenario("only", p=1, definition="One scenario", reason="Fixture")
     s.estimate("growth", Distribution.from_point(2), given="only", reason="Fixture")
-    assert s.store.read()[0]["schema_version"] == 6
+    assert s.store.read()[0]["schema_version"] == 7
 
 
 def test_path_decisions_are_paired_and_excluded_processes_need_no_prior(s):

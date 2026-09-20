@@ -33,7 +33,8 @@ def lint(state):
         if space == "log" and crosses_zero:
             warnings.append(finding("support-crosses-zero", "Log-tagged quantity has support at or below zero.", node=node))
         if space == "logit" and (points[0] < 0 or points[1] > 1):
-            warnings.append(finding("support-outside-rate", "Logit-tagged quantity has support outside [0, 1].", node=node))
+            warnings.append(finding("support-outside-rate", "Logit-tagged quantity has support outside [0, 1].", node=node,
+                                    remedy="Re-estimate with --shape logitnormal (strictly interior interval endpoints), or explicitly bounded samples/quantiles. Then sample again; do not clip invalid rate draws after sampling."))
         for assumption in est["assumes"]:
             citations[assumption].add(node)
         cutoff = state["context"].get("asof")
@@ -89,6 +90,10 @@ def lint(state):
         if state["strategies"][fork]["status"] == "abandoned":
             continue
         values = {}
+        for node in sorted(set(graph) & ({key for key, _ in estimates})):
+            warnings.append(finding("overridden-estimate", "A relation overrides this node's direct estimate or anchor in this fork; the estimate is not a constraint or a lower bound.",
+                                    node=node, fork=fork,
+                                    remedy="Use a separate evidence leaf and relate it explicitly, or use bound TARGET --lower VALUE --reason TEXT if the population mapping supports a bound. Bounds warn unless --clip is specified."))
         for node in graph_order(state, fork):
             q = state["quantities"][node]
             try:

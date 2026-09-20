@@ -30,7 +30,10 @@ Maintain `RESEARCH.md` in each study directory using the guide's evidence
 requirements. Before presenting a completed estimate or polished report, review
 the evidence for every research step, document remaining gaps and the stopping
 rationale, and append a substantive summary to the target's Stanton notes before
-saving the final run. Read `report context` before final narration. A successful
+saving the final run. Then save a structured `research review` and use
+`report issue` to freeze the conclusion from that run. Use the guide and
+`research template` for exact commands and required fields. Read `report context`
+before final narration; use the issued headline and labeled intervals. A successful
 sample, lint, validation, or report export is not a research-quality check.
 
 Seek independent source families, investigate contradictions, attempt an

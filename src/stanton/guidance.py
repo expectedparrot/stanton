@@ -6,6 +6,11 @@ from .research import research_guide, research_workflow
 GUIDE = research_guide() + """Stanton is a local numerical estimation workbench.
 Start with init PATH. Every later command accepts --project PATH.
 Define a scalar with units, a precise definition, and space log/linear/logit.
+Mark the requested output with --status target. Use count for counts, not an
+undefined unit such as businesses. Define rates with --space logit.
+Estimate --interval selects normal/lognormal/logitnormal from linear/log/logit
+space by default; --shape overrides this explicitly. Logitnormal endpoints
+must lie strictly inside (0,1); use --value for exact zero/one.
 Use anchor for a dated sourced point; estimate for an uncertain distribution.
 An interval is an equal-tailed central interval with coverage --p (default .8).
 Use --reason to label judgment; source verification remains your responsibility.
@@ -47,7 +52,32 @@ predicate flips. It reports strict-below and tie mass; percentile is midrank.
 Decision and definition branches have no probability weights and are never merged.
 Sample again after editing; show reports newer working revisions explicitly.
 Save FILE exports history; load FILE requires a new destination project.
-Validate checks history integrity and stored samples. Lint is advisory.
+Validate checks history integrity, stored samples, and immutable research/issuance
+records. Lint offers corrective instructions; inspect and address its findings.
+Research template TARGET --run RUN_ID --output review.json creates a bound form.
+Fill its source population mappings, searches, reconciliation, alternate route,
+dependence, uncertainty, sensitivity comparisons, and stopping rationale using
+actual evidence. Run schema research_review for its field contract. Sensitivity
+comparisons reference baseline_run and variation_run with changed numerical
+inputs, not merely a different seed or strategy; restore the intended model and
+save the final run after stress tests. For multi-context runs, save sensitivity
+runs selecting the same single definition and decision context. If sensitivity
+is inapplicable, explain the concrete reason. Do not invent comparisons.
+Research review NAME --from review.json saves the review and computed comparisons.
+Read research show NAME for detected shared leaves, sources, and ancestry; an
+absence of detected overlap does not establish independence. A source outside
+the target population cannot establish a bound without a defensible mapping.
+Report issue NAME --review REVIEW --method strategy:FORK/mixture freezes the
+headline from the selected run. --coverages .8,.9 labels p10–p90 and p5–p95.
+Rates with support outside [0,1] block issuance, including provisional issuance.
+Reviewed issuance requires dispositions for all remaining warnings and no material
+research gaps. Record status provisional and disclose remaining_gaps when work
+is incomplete. Other warnings can be justified individually using warning_id and
+reason; an acknowledgment does not fix an invalid model or verify a source.
+Report show NAME retrieves the immutable conclusion; research status TARGET
+shows current/stale reviews and issued reports. Edit the model or evidence, then
+sample and review again to change a headline. Appending review/issuance records
+alone does not invalidate the run. Archives preserve these records and bindings.
 Next suggests model operations and reminds the agent to review the research
 contract. Computational readiness does not establish research completeness.
 Report context exports factual material for the calling agent's explanation.
@@ -108,8 +138,8 @@ Calibration evaluate NAME compares raw/adjusted scores on identical events,
 with separate training and test results. Training evidence stays pinned;
 test evidence uses the chosen --revision. Observations before fitting are
 flagged. Repeated selection on test results compromises a holdout interpretation.
-Version 0.6 has no network, inference, or survey execution.
-Scoring does not certify sources or coverage. Historical v0.1–v0.5 projects
+Version 0.7 has no network, inference, or survey execution.
+Scoring does not certify sources or coverage. Historical v0.1–v0.6 projects
 remain readable.
 """
 
@@ -122,6 +152,11 @@ def next_actions(session):
         tasks.append({"kind": "define_target", "description": "Define the scalar, units, and scope to estimate.",
                       "required_inputs": ["name", "units", "definition"], "schema": "quantity", "mutates": True, "network": False})
     targets = [node for node, quantity in state["quantities"].items() if quantity["status"] == "target"]
+    if not targets:
+        from .expressions import parse
+        graph = state["graphs"]["main"]
+        used = {node for relation in graph.values() for node in parse(relation["expression"])[1]}
+        targets = sorted(set(graph) - used)
     for node, quantity in state["quantities"].items():
         if not targets and not quantity.get("process") and node not in state["estimates"] and node not in state.get("conditional_estimates", {}) and node not in state.get("decisions", {}) and not any(node in graph for graph in state["graphs"].values()):
             tasks.append({"kind": "supply_model_input", "node": node, "description": "Supply an estimate or a relation for this quantity.",
@@ -131,7 +166,7 @@ def next_actions(session):
         from .sampling import select_forks
         tasks.append({"kind": "inspect", "argv": root + ["lint"], "mutates": False, "network": False})
         for node, quantity in state["quantities"].items():
-            if quantity["status"] == "target":
+            if node in targets:
                 try:
                     branches = layout(state, node, select_forks(state, node))
                     leaf_plan(state, branches)
@@ -146,9 +181,22 @@ def next_actions(session):
                     if exc.code != "not_found":
                         raise
                     run = None
-                if run and run["revision"] == revision:
+                if run and not session.show(node, run_id=run["id"])["stale_run"]:
                     tasks.append({"kind": "inspect_result", "argv": root + ["show", node, "--run", run["id"]],
                                   "mutates": False, "network": False})
+                    reviews = {k: r for k, r in state.get("research_reviews", {}).items() if r["run_id"] == run["id"]}
+                    if not reviews:
+                        tasks.append({"kind": "record_research_review", "target": node, "run_id": run["id"],
+                                      "description": "Create research template, fill it from actual evidence, and save research review before report issue.",
+                                      "schema": "research_review", "argv": root + ["schema", "research_review"],
+                                      "required_inputs": ["new template output path", "source mappings and research findings", "saved sensitivity runs or concrete not-applicable reason", "review name"],
+                                      "mutates": False, "network": False})
+                    elif not any(r["run_id"] == run["id"] for r in state.get("issued_reports", {}).values()):
+                        tasks.append({"kind": "issue_report", "target": node, "run_id": run["id"], "reviews": sorted(reviews),
+                                      "description": "Address review findings, then report issue with a new name, chosen review, method, and context. Inspect report context first.",
+                                      "argv": root + ["report", "context", node, "--run", run["id"]],
+                                      "required_inputs": ["issued report name", "review", "method/context if ambiguous"],
+                                      "mutates": False, "network": False})
                 else:
                     tasks.append({"kind": "sample", "argv": root + ["sample", node], "mutates": True, "network": False})
     # Add agent work after determining executable model actions: a reminder must
@@ -158,8 +206,16 @@ def next_actions(session):
                      "argv": root + ["guide"], "mutates": False, "network": False,
                      "execution": "Reading the guide is local; the research itself is agent work and may require external tools.",
                      "completion_status": "not_assessed"})
+    research_status = session.research_status()
+    current_reviews = {k: r for k, r in research_status["reviews"].items() if r["current_basis"]}
+    if current_reviews:
+        tasks[0].update(description="Inspect recorded research reviews, unresolved findings, and issuance status. Records do not certify research quality.",
+                        argv=root + ["research", "status"], completion_status="recorded")
+        for review_name, record in current_reviews.items():
+            tasks.append({"kind": "inspect_research_review", "target": record["target"],
+                          "argv": root + ["research", "show", review_name], "mutates": False, "network": False})
     for survey, record in state.get("surveys", {}).items():
         if any(p["status"] == "pending" for p in record["proposals"].values()):
             tasks.append({"kind": "review_responses", "argv": root + ["survey", "review", survey],
                           "mutates": False, "network": False})
-    return {"revision": revision, "advisory": True, "research_workflow": research_workflow(), "next_actions": tasks}
+    return {"revision": revision, "advisory": True, "research_workflow": research_workflow(), "research_status": research_status, "next_actions": tasks}

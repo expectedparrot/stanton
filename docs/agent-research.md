@@ -16,8 +16,11 @@ Installing a Python package cannot change another agent's system instructions
 automatically.
 
 The contract lives in `src/stanton/research.py`. All three CLI surfaces use it.
-Research completion is always returned as `not_assessed`: the application
-cannot establish whether the agent actually investigated the evidence. A
+The guidance contract keeps research quality `not_assessed`: the application
+cannot establish whether the agent actually investigated the evidence. Version
+0.7 separately records agent-declared `reviewed` or `provisional` status in
+immutable run-bound research reviews. These are declarations with mechanical
+checks, not an assessment of research quality. A
 successful `sample`, `validate`, or report export must never be described as
 verification of research quality. The agent must perform and document the review.
 
@@ -94,8 +97,13 @@ Before the final run, append a substantive summary of the review with
 `stanton note TARGET "..." --project PROJECT`. Include findings, source
 independence, unresolved issues, sensitivity results, status, and the stopping
 rationale. A link to `RESEARCH.md` alone is insufficient: `stanton save` preserves
-project notes but does not bundle arbitrary external files. Run IDs can be added
-to the external record after sampling without changing the frozen project.
+project notes but does not bundle arbitrary external files. After sensitivity tests, restore the intended model, write the final note, and
+sample. Then fill `research template TARGET --output review.json`, save it with
+`research review NAME --from review.json`, and use `report issue` to freeze the
+computed conclusion. Follow the [runnable review walkthrough](research-review.md)
+for source mappings, actual sensitivity comparisons, warning dispositions, and
+issuance rules. Run IDs can be added to the external record after sampling
+without changing the frozen project.
 
 ## Cape Cod Canal: what should have happened
 

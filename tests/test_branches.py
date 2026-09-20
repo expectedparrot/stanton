@@ -217,7 +217,7 @@ def test_branch_archives_roundtrip_and_invalid_decisions_rollback(s, tmp_path):
     second = tmp_path / "second.gz"
     restored.save(second)
     assert gzip.decompress(path.read_bytes()) == gzip.decompress(second.read_bytes())
-    assert json.loads(gzip.decompress(second.read_bytes()))["data"]["revisions"][-1]["body"]["schema_version"] == 6
+    assert json.loads(gzip.decompress(second.read_bytes()))["data"]["revisions"][-1]["body"]["schema_version"] == 7
 
 
 def test_legacy_run_remains_valid_when_project_gains_conditional_estimates(s, tmp_path):

@@ -11,6 +11,7 @@ from .distributions import Distribution
 from .evaluation_api import EvaluationOperations
 from .lint import lint
 from .process_api import ProcessOperations
+from .research_api import ResearchOperations
 from .sampling import sample as sample_model
 from .sampling import validate_run
 from .schemas import validate_state
@@ -18,7 +19,7 @@ from .store import Store
 from .survey_api import SurveyOperations
 
 
-class Session(ProcessOperations, SurveyOperations, EvaluationOperations, CalibrationOperations):
+class Session(ProcessOperations, SurveyOperations, EvaluationOperations, CalibrationOperations, ResearchOperations):
     def __init__(self, project=".", *, expected_revision=None):
         self.store = Store(project)
         self.expected_revision = expected_revision
@@ -29,13 +30,13 @@ class Session(ProcessOperations, SurveyOperations, EvaluationOperations, Calibra
         if asof:
             date.fromisoformat(asof)
         session = cls(project)
-        state = {"schema_version": 6, "id": identifier("project"), "title": nonblank(title, "Title"),
+        state = {"schema_version": 7, "id": identifier("project"), "title": nonblank(title, "Title"),
                  "context": {"now": now(), "timezone": timezone, "locale": locale.getlocale()[0], "asof": asof},
                  "quantities": {}, "estimates": {}, "assumptions": {}, "graphs": {"main": {}},
                  "strategies": {"main": {"status": "active", "target": None, "reason": "Initial relation graph."}},
                  "bounds": {}, "merges": {}, "notes": {}, "scenario_groups": {}, "scenarios": {},
                  "conditional_estimates": {}, "decisions": {}, "definitions": {}, "bridges": {}, "series": {}, "allocations": {},
-                 "surveys": {}, "resolutions": {}, "cohorts": {}, "calibrations": {}}
+                 "surveys": {}, "resolutions": {}, "cohorts": {}, "calibrations": {}, "research_reviews": {}, "issued_reports": {}}
         session.store.init(state)
         return session
 
@@ -248,11 +249,19 @@ class Session(ProcessOperations, SurveyOperations, EvaluationOperations, Calibra
         _, revision = self.store.read()
         return {**result, "working_revision": revision, "newer_working_revision": revision != run["revision"]}
 
-    def show(self, target=None, *, run_id=None, quantiles=(5, 25, 50, 75, 95)):
+    def show(self, target=None, *, run_id=None, quantiles=(5, 25, 50, 75, 95), coverages=(.8, .9)):
         from .reports import show
         run = self.store.run(run_id, target)
-        _, revision = self.store.read()
-        return show(run, revision, quantiles)
+        from .research_records import evidence_digest
+        current, revision = self.store.read()
+        frozen, _ = self.store.read(run["revision"])
+        result = show(run, revision, quantiles, coverages)
+        result["stale_run"] = evidence_digest(current) != evidence_digest(frozen)
+        if result["stale_run"]:
+            result["warnings"].append({"code": "stale-run", "message": "Model or evidence changed after this saved run. Sample again and review before issuing a current conclusion."})
+        elif result["newer_working_revision"]:
+            result["warnings"].append({"code": "newer-working-revision", "message": "Newer bookkeeping revisions exist; the model and notes still match this run."})
+        return result
 
     def audit(self, target, *, run_id=None):
         from .reports import audit
@@ -275,17 +284,18 @@ class Session(ProcessOperations, SurveyOperations, EvaluationOperations, Calibra
                                    "proposals": len(survey["proposals"])} for key, survey in state.get("surveys", {}).items()},
                 "resolutions": len(state.get("resolutions", {})), "cohorts": list(state.get("cohorts", {})),
                 "calibrations": list(state.get("calibrations", {})),
+                "research_reviews": list(state.get("research_reviews", {})), "issued_reports": list(state.get("issued_reports", {})),
                 "warnings": lint(state)}
 
     def validate(self):
-        from .calibration_validation import validate_artifact_history
         from .elicitation import validate_survey_history
+        from .research_records import validate_artifact_history
         return self.store.validate(validate_state, validate_run, validate_survey_history, validate_artifact_history)
 
     def save(self, path):
         return self.store.export(path)
 
     def load(self, path):
-        from .calibration_validation import validate_artifact_history
         from .elicitation import validate_survey_history
+        from .research_records import validate_artifact_history
         return self.store.restore(path, validate_state, validate_run, validate_survey_history, validate_artifact_history)

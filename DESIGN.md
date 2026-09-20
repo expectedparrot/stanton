@@ -1,7 +1,7 @@
 # Stanton implementation design
 
 Review of `spec.md` v0.4 and neighboring packages, 2026-09-19.
-This is the implementation contract and delivery plan. Version 0.6 implements
+This is the implementation contract and delivery plan. Version 0.7 implements
 the first three slices; see `README.md`, `docs/conditional-models.md`, and
 `docs/paths-and-allocations.md` for shipped behavior and limits.
 It also implements elicitation, outcome evaluation, and scalar spread calibration
@@ -82,9 +82,16 @@ The agent guide requires high-effort empirical research by default, including
 source independence, anomaly investigation, alternative methods, stress tests,
 and an evidence-backed synthesis review. `guide`, `next`, and `report context`
 share the contract in `research.py`. Repository agent instructions require its
-use; external agents must be instructed to read the guide. Research status stays
-`not_assessed` in tool outputs: numerical validity does not certify that research
-was performed. Study records and frozen target notes preserve the agent's review.
+use; external agents must be instructed to read the guide. Research quality stays
+`not_assessed` in the guidance contract. Structured research records separately
+preserve agent-declared reviewed/provisional status, population mappings,
+shared evidence, actual sensitivity comparisons, and stopping rationale.
+`report issue` binds a computed headline and labeled intervals to an immutable
+review and run. Stale model/evidence and invalid rate support block issuance;
+reviewed issuance also requires warning dispositions and no material gaps.
+State schema 7 adds append-only research/issuance registries; numerical run
+schema 3 is unchanged. Archive validation replays these records against their
+birth revisions. This checks consistency, not research quality or source truth.
 Expose complex records through `--from FILE` as well as convenient flags.
 Add explicit commands for assumptions, decisions, and definitions, which appear
 in the ontology but lack a complete CLI contract in the spec.

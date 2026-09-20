@@ -153,3 +153,16 @@ def test_project_flag_placement_and_estimate_file(tmp_path):
     result = run_cli("sample", "x", "-n", "10", "--project", "p", cwd=tmp_path)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["data"]["forks"]["main"]["mean"] == 3
+
+
+def test_research_review_walkthrough_in_fresh_processes(tmp_path):
+    execute_walkthrough(ROOT / "docs/research-review.md", tmp_path)
+    project = Session(tmp_path / "reviewed-study")
+    restored = Session(tmp_path / "restored-reviewed-study")
+    assert project.validate()["ok"] and restored.validate()["ok"]
+    issued = project.research_show("synthetic_answer", issued=True)
+    assert issued == restored.research_show("synthetic_answer", issued=True)
+    assert issued["current_basis"]
+    review = project.research_show("synthetic_review")["record"]
+    assert review["sensitivity_results"][0]["results"]["strategy:main"]["variation"]["median"] == 80
+    assert issued["record"]["headline"]["intervals"][0]["coverage"] == .8

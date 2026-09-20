@@ -3,13 +3,13 @@
 from copy import deepcopy
 
 RESEARCH_WORKFLOW = {
-    "version": "stanton.research.v1",
+    "version": "stanton.research.v2",
     "default_effort": "high",
     "applies_to": "Empirical estimation studies; not software maintenance or explicitly synthetic demonstrations.",
     "override": "Use a lighter pass only when the user explicitly requests it; record the constraint and omitted work. Do not ask permission to perform the default research.",
     "completion_status": "not_assessed",
-    "verification": "Agent-reviewed evidence is required. Stanton does not browse, verify sources, assess research completeness, or enforce this contract mechanically. Sampling, lint, validation, and a saved report are not evidence of research completion.",
-    "record": "Maintain RESEARCH.md in the study directory. Append a substantive summary of its findings, limitations, review status, and stopping rationale to the target using note before the final saved run. A bare link or checked checklist is insufficient. External files are not bundled by project save; the target note is.",
+    "verification": "Agent-reviewed evidence is required. Stanton does not browse, verify sources, assess research completeness, or certify fulfillment of this contract. Structured research reviews and issuance enforce run bindings, required records, warning dispositions, and reproducible numerical summaries. Sampling, lint, validation, and a saved report are not evidence of research completion.",
+    "record": "Maintain RESEARCH.md in the study directory. Append a substantive summary of its findings, limitations, review status, and stopping rationale to the target using note before the final saved run. A bare link or checked checklist is insufficient. Then create a run-bound research template, fill it with actual evidence, save a research review, and use report issue before presenting a completed conclusion. External files are not bundled by project save; target notes, structured reviews, and issued reports are.",
     "steps": [
         {
             "id": "scope",
@@ -44,7 +44,7 @@ RESEARCH_WORKFLOW = {
         {
             "id": "synthesis_gate",
             "title": "Review research before presenting a completed estimate",
-            "instruction": "Before final synthesis or a polished HTML report, review each step against actual evidence. Continue tractable work that could materially change the result. Stop when additional accessible research is unlikely to alter the conclusion materially, or explicit user constraints/access limits prevent further progress; record why. Disclose remaining gaps and label the result provisional when material research remains incomplete. Do not call a lookup-plus-judgment range a triangulated estimate. Keep strategy disagreement and source dependence visible; synthesize only with a defensible rationale. A user-requested interim report must disclose its incomplete status.",
+            "instruction": "Before final synthesis or a polished HTML report, review each step against actual evidence. Continue tractable work that could materially change the result. Stop when additional accessible research is unlikely to alter the conclusion materially, or explicit user constraints/access limits prevent further progress; record why. Disclose remaining gaps and label the result provisional when material research remains incomplete. Do not call a lookup-plus-judgment range a triangulated estimate. Never relabel p5–p95 as an 80% interval: it is 90%. Do not revise the headline in prose without a revised saved model. Keep strategy disagreement and source dependence visible; synthesize only with a defensible rationale. A user-requested interim report must disclose its incomplete status.",
             "evidence": "Agent review with links to completed work, unresolved items, result status, and a specific stopping rationale; final answer distinguishes observations, assumptions, and computed results.",
         },
     ],

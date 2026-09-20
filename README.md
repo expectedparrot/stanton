@@ -4,11 +4,13 @@ A local numerical estimation workbench for people and agents. Supply estimates
 and their provenance, combine them with unit-aware arithmetic, and preserve the
 resulting uncertainty and revision history.
 
-Version 0.6 implements the first three delivery slices in [DESIGN.md](DESIGN.md):
+Version 0.7 implements the first three delivery slices in [DESIGN.md](DESIGN.md):
 scalar estimation, conditional models, persistent paths, periodic profiles,
 and conserved allocations. The fourth slice now includes bound surveys,
 optional EDSL compilation, reviewed response import, sourced outcomes, and
 scoring of fixed evaluation cohorts, and training-only fitted spread adjustments.
+Run-bound research reviews and issued conclusions now preserve source mappings,
+sensitivity comparisons, warning dispositions, and explicitly labeled intervals.
 The broader product proposal is in [spec.md](spec.md).
 
 ## Install from GitHub
@@ -199,6 +201,10 @@ record a synthesis review before presenting a completed estimate. `next` and
 `report context` repeat this contract; computational readiness does not establish
 research completeness. See [the agent research workflow](docs/agent-research.md)
 for the study record template and instructions for external agents.
+Use `research template`, `research review`, and `report issue` to bind a conclusion
+to saved evidence and numerical results. See the [runnable research review
+walkthrough](docs/research-review.md). Issuance checks stale inputs and unresolved
+model findings; it does not certify research quality.
 
 See [Instructions for your agent](#instructions-for-your-agent) for the
 copy-and-paste installation and startup instructions.
