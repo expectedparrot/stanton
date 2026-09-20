@@ -13,40 +13,36 @@ The broader product proposal is in [spec.md](spec.md).
 
 ## Install from GitHub
 
-Requires Python 3.11+ and Git. From your working directory:
+Requires [uv](https://docs.astral.sh/uv/getting-started/installation/) and Git.
 
 ```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install "git+https://github.com/expectedparrot/stanton.git"
-.venv/bin/stanton guide
+uv tool install --python 3.11 "stanton @ git+https://github.com/expectedparrot/stanton.git@main"
+export PATH="$(uv tool dir --bin):$PATH"
+stanton guide
 ```
 
-Read the guide first; it explains the research workflow and available commands.
-To use the shorter `stanton` commands in the examples below, activate the
-environment with `source .venv/bin/activate`. Numerical operations run locally;
-installation and the agent's external research require network access.
-`python -m stanton` also works in the activated environment.
+`stanton guide` is the agent's golden-path entry point. It supplies the research
+workflow and command guidance; `stanton next --project PATH` supplies subsequent
+project-specific actions. Numerical operations run locally; installation and the
+agent's external research require network access.
 
 ## Instructions for your agent
 
 Copy and paste this block:
 
 ```text
-Use Stanton for this estimation task. Install it from GitHub using Python 3.11+
-and Git (reuse an existing virtual environment if appropriate):
+Use Stanton to research my estimation question and produce a sourced estimate.
+Install uv if needed: https://docs.astral.sh/uv/getting-started/installation/
+Git is also required. Then install Stanton from GitHub:
 
-python3 -m venv .venv
-.venv/bin/python -m pip install "git+https://github.com/expectedparrot/stanton.git"
+uv tool install --python 3.11 "stanton @ git+https://github.com/expectedparrot/stanton.git@main"
+export PATH="$(uv tool dir --bin):$PATH"
 
-Then run this command and read its complete output before starting the estimate:
+Run the golden-path guidance command:
 
-.venv/bin/stanton guide
+stanton guide
 
-Follow the guide's high-effort research workflow. Use .venv/bin/stanton for
-subsequent commands. For a new study, run `.venv/bin/stanton init study`, then
-`.venv/bin/stanton next --project study`; for an existing study, use its project
-directory. Research the question, build and check the model, and report the
-estimate with its sources, assumptions, and unresolved uncertainties.
+Read its complete output and follow its instructions through completion.
 ```
 
 ## A complete example

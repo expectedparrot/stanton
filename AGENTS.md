@@ -2,22 +2,21 @@
 
 ## Install and start
 
-Requires Python 3.11+ and Git. To use Stanton for an estimation task, install it
-from GitHub in your working directory (reuse a virtual environment if available):
+For estimation tasks, install from GitHub with uv and Git. Install uv if needed:
+https://docs.astral.sh/uv/getting-started/installation/
 
 ```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install "git+https://github.com/expectedparrot/stanton.git"
-.venv/bin/stanton guide
+uv tool install --python 3.11 "stanton @ git+https://github.com/expectedparrot/stanton.git@main"
+export PATH="$(uv tool dir --bin):$PATH"
+stanton guide
 ```
 
-Read the complete guide output before research or modeling. For a new study,
-run `.venv/bin/stanton init study`, then
-`.venv/bin/stanton next --project study`. Use the existing project path when
-resuming. Use `.venv/bin/stanton` for subsequent commands.
+`stanton guide` is the golden-path entry point. Read its complete output and
+follow its instructions; use its project-specific `next` guidance as work proceeds.
 
 When developing Stanton in this checkout, install the local source instead:
-`.venv/bin/python -m pip install -e '.[dev]'`.
+create a virtual environment, install with `python -m pip install -e '.[dev]'`
+using that environment, and use its `stanton` executable.
 
 ## Follow the guide
 
