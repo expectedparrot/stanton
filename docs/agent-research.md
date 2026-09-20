@@ -10,9 +10,10 @@ puts a research-review reminder before computational suggestions, even when a
 saved run exists. `stanton report context TARGET` includes the same structured
 contract alongside the frozen numerical evidence. Repository agents also receive
 this instruction through [AGENTS.md](../AGENTS.md). For installations used by an
-external agent, put “Read and follow `stanton guide` before empirical estimation”
-in that agent's instructions; installing a Python package cannot change another
-agent's system instructions automatically.
+external agent, copy the [README's agent instructions](../README.md#instructions-for-your-agent),
+which install Stanton from GitHub and run the guide as the next command.
+Installing a Python package cannot change another agent's system instructions
+automatically.
 
 The contract lives in `src/stanton/research.py`. All three CLI surfaces use it.
 Research completion is always returned as `not_assessed`: the application

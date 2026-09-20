@@ -11,17 +11,43 @@ optional EDSL compilation, reviewed response import, sourced outcomes, and
 scoring of fixed evaluation cohorts, and training-only fitted spread adjustments.
 The broader product proposal is in [spec.md](spec.md).
 
-## Install locally
+## Install from GitHub
+
+Requires Python 3.11+ and Git. From your working directory:
 
 ```bash
-uv venv
-uv pip install -e '.[dev]'
-source .venv/bin/activate
-stanton guide
+python3 -m venv .venv
+.venv/bin/python -m pip install "git+https://github.com/expectedparrot/stanton.git"
+.venv/bin/stanton guide
 ```
 
-Python 3.11+ is required. Everything below runs locally, without an account,
-network request, or model call. `python -m stanton` also works.
+Read the guide first; it explains the research workflow and available commands.
+To use the shorter `stanton` commands in the examples below, activate the
+environment with `source .venv/bin/activate`. Numerical operations run locally;
+installation and the agent's external research require network access.
+`python -m stanton` also works in the activated environment.
+
+## Instructions for your agent
+
+Copy and paste this block:
+
+```text
+Use Stanton for this estimation task. Install it from GitHub using Python 3.11+
+and Git (reuse an existing virtual environment if appropriate):
+
+python3 -m venv .venv
+.venv/bin/python -m pip install "git+https://github.com/expectedparrot/stanton.git"
+
+Then run this command and read its complete output before starting the estimate:
+
+.venv/bin/stanton guide
+
+Follow the guide's high-effort research workflow. Use .venv/bin/stanton for
+subsequent commands. For a new study, run `.venv/bin/stanton init study`, then
+`.venv/bin/stanton next --project study`; for an existing study, use its project
+directory. Research the question, build and check the model, and report the
+estimate with its sources, assumptions, and unresolved uncertainties.
+```
 
 ## A complete example
 
@@ -178,19 +204,8 @@ record a synthesis review before presenting a completed estimate. `next` and
 research completeness. See [the agent research workflow](docs/agent-research.md)
 for the study record template and instructions for external agents.
 
-Copy this block into the instructions for an agent using Stanton:
-
-```text
-Before empirical estimation, run `stanton guide` and follow its research contract.
-Use high-effort research unless I explicitly request a lighter pass. Investigate
-independent sources, discrepancies, alternative estimation methods, and sensitivity
-to consequential assumptions. Maintain a substantive RESEARCH.md in the study
-directory and preserve the research review in the target's Stanton notes before
-the final run. Read `stanton report context TARGET` before final synthesis.
-Sampling and validation do not establish research completeness. Disclose material
-gaps and label incomplete estimates provisional; do not manufacture evidence or
-claim that repeated source material constitutes independent corroboration.
-```
+See [Instructions for your agent](#instructions-for-your-agent) for the
+copy-and-paste installation and startup instructions.
 
 Success produces one versioned JSON envelope on stdout. Failure produces a
 structured error on stderr with a nonzero exit code. JSON includes warnings and
@@ -235,7 +250,12 @@ empirical calibration are not established by the tool.
 
 ## Development
 
+From a clone of this repository:
+
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
 python -m pytest -q
 ruff check src tests examples
 python -m build

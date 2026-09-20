@@ -1,8 +1,28 @@
 # Working with Stanton
 
-For empirical estimation tasks in this repository, run `.venv/bin/stanton guide`
-(or `stanton guide` with another installation) before research or modeling and
-follow its agent research contract. This applies on resumed studies too; consult
+## Install and start
+
+Requires Python 3.11+ and Git. To use Stanton for an estimation task, install it
+from GitHub in your working directory (reuse a virtual environment if available):
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install "git+https://github.com/expectedparrot/stanton.git"
+.venv/bin/stanton guide
+```
+
+Read the complete guide output before research or modeling. For a new study,
+run `.venv/bin/stanton init study`, then
+`.venv/bin/stanton next --project study`. Use the existing project path when
+resuming. Use `.venv/bin/stanton` for subsequent commands.
+
+When developing Stanton in this checkout, install the local source instead:
+`.venv/bin/python -m pip install -e '.[dev]'`.
+
+## Follow the guide
+
+For empirical estimation, follow the guide's research contract.
+This applies on resumed studies too; consult
 existing research records and continue from them rather than repeating completed
 work. High-effort research is the default unless the user explicitly requests a
 lighter pass. Do not ask permission to do the default research.
