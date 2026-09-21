@@ -8,6 +8,38 @@ A local numerical estimation workbench for people and agents. Supply estimates
 and their provenance, combine them with unit-aware arithmetic, and preserve the
 resulting uncertainty and revision history.
 
+## Copy and paste for agents
+
+Paste this entire block into a fresh coding-agent session, along with your
+estimation question:
+
+```text
+Use Stanton to research my estimation question and produce a sourced estimate
+with uncertainty. If I haven't supplied a question, ask for one.
+
+Install uv if needed: https://docs.astral.sh/uv/getting-started/installation/
+Git is also required. Install Stanton from GitHub:
+
+uv tool install --python 3.11 "stanton @ git+https://github.com/expectedparrot/stanton.git@main"
+export PATH="$(uv tool dir --bin):$PATH"
+
+Read the installed agent guidance before starting the study:
+
+stanton guide
+
+Read its complete output and follow its instructions through completion.
+Use its guidance to create or resume a project, then follow the project-specific
+steps from `stanton next --project PATH`, replacing PATH with the study folder.
+Preserve existing research and project history when resuming.
+
+Use the guide's full research workflow by default. Finish with its research
+review and issued conclusion, and show me the sourced estimate, uncertainty,
+scope, reference period, key assumptions, and remaining limitations. If material
+research gaps remain, label the result provisional and explain them.
+```
+
+## Current capabilities
+
 Version 0.8 implements the first three delivery slices in [DESIGN.md](DESIGN.md):
 scalar estimation, conditional models, persistent paths, periodic profiles,
 and conserved allocations. The fourth slice now includes bound surveys,
@@ -33,25 +65,6 @@ stanton guide
 workflow and command guidance; `stanton next --project PATH` supplies subsequent
 project-specific actions. Numerical operations run locally; installation and the
 agent's external research require network access.
-
-## Instructions for your agent
-
-Copy and paste this block:
-
-```text
-Use Stanton to research my estimation question and produce a sourced estimate.
-Install uv if needed: https://docs.astral.sh/uv/getting-started/installation/
-Git is also required. Then install Stanton from GitHub:
-
-uv tool install --python 3.11 "stanton @ git+https://github.com/expectedparrot/stanton.git@main"
-export PATH="$(uv tool dir --bin):$PATH"
-
-Run the golden-path guidance command:
-
-stanton guide
-
-Read its complete output and follow its instructions through completion.
-```
 
 ## A complete example
 
