@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/stanton-artwork.png" width="760" alt="Stanton artwork: a green parrot estimating the number of jelly beans in a jar, with candidate counts above it, inside expectation brackets">
+</p>
+
 # Stanton
 
 A local numerical estimation workbench for people and agents. Supply estimates
